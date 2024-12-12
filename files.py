@@ -9,8 +9,8 @@ from utils import generate_excel
 # Chemin vers le fichier HQL
 
 if __name__ == "__main__":
-    root_dir = "C:/Users/YBQB7360/Downloads/HDFS/HDFS"
-    conf_dir = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
+    root_dir = "C:/Users/dokie/Downloads/wetransfer_hdfs_2024-12-09_1245/HDFS/HDFS"
+    conf_dir = r"C:\Users\dokie\Downloads\wetransfer_hdfs_2024-12-09_1245\HDFS\HDFS\PROD\CONF"
     conf_dir=os.path.normpath(conf_dir) 
     chains=list_all_files(conf_dir)
 

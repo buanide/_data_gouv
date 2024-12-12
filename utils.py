@@ -106,10 +106,13 @@ def extract_data_sources(hql_file_path):
     # Combiner les tables trouvées dans FROM et JOIN
     tables = tables_from + tables_join
 
+    for i in range(len(tables)):
+        tables[i]=tables[i].upper()
+
     # Supprimer les doublons
     tables = list(set(tables))
-    
 
+    
     # Identifier la table principale
     main_table = insert_into_tables[0] if insert_into_tables else None
 
