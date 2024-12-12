@@ -213,15 +213,58 @@ def extract_table_names_from_load_conf_files_(file_queries):
 
 def generate_excel(dependency_map, output_file):
     """
-    Génère un fichier Excel à partir du dictionnaire de dépendances.
+    Génère un fichier Excel en ajoutant des lignes pour chaque dépendance,
+    en progressant récursivement pour chaque niveau de dépendance.
+    
+    Args:
+        dependency_map (dict): Dictionnaire des dépendances {table: [dépendances]}.
+        output_file (str): Chemin du fichier Excel de sortie.
     """
-    data = []
-    for main_table, dependencies in dependency_map.items():
-        for dependency in dependencies:
-            data.append([main_table, dependency])
+    if not dependency_map:
+        print("Aucune dépendance trouvée.")
+        return
 
-    df = pd.DataFrame(data, columns=["Table Principale", "Dépendance"])
+    # Liste pour stocker les lignes du tableau final
+    rows = []
+
+    def process_table(table, dependency_path, visited_tables):
+        """
+        Récursivement, ajoute les dépendances dans le tableau final.
+        
+        Args:
+            table (str): Table principale ou dépendance à traiter.
+            dependency_path (list): Chemin hiérarchique des dépendances.
+            visited_tables (set): Ensemble des tables déjà visitées pour éviter les boucles.
+        """
+        # Si la table est déjà visitée, éviter la récursion infinie
+        if table in visited_tables:
+            print(f"Avertissement : Cycle détecté pour la table '{table}'. Ignoré.")
+            return
+        
+        # Ajouter la table actuelle au chemin de dépendance
+        visited_tables.add(table)
+
+        # Ajouter une ligne pour la table courante et son chemin de dépendance
+        row = dependency_path + [table]
+        rows.append(row)
+        
+        # Si la table a des dépendances, continuer récursivement
+        if table in dependency_map:
+            for dep in dependency_map[table]:
+                process_table(dep, row, visited_tables.copy())
+
+    # Parcourir chaque table principale dans le dictionnaire
+    for main_table in dependency_map:
+        process_table(main_table, [], set())
+
+    # Trouver le niveau maximum de dépendance pour ajuster les colonnes
+    max_depth = max(len(row) for row in rows)
+    columns = [f"Dep_datalake{i+1}" for i in range(max_depth)]
+
+    # Créer le DataFrame final
+    df = pd.DataFrame(rows, columns=columns)
     df.to_excel(output_file, index=False)
+   
                       
 
 
