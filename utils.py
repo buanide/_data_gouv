@@ -75,13 +75,90 @@ def extract_table_name_from_file(file_path):
         print(f"Erreur lors de la lecture du fichier {file_path}: {e}")
     return None
 
+def extract_tables_from_queries(queries):
+    """
+    Extrait les noms des tables de la forme DOMAINE.NOM_TABLE des requêtes SQL.
+
+    Retourne: Une liste des noms des tables extraites.
+    """
+    # Motif pour trouver les tables dans les clauses FROM et JOIN
+    table_pattern = r'\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b'
+    join_pattern = r'\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b'
+
+    # Combiner les motifs pour trouver toutes les tables
+    tables = re.findall(table_pattern, queries, re.IGNORECASE) + re.findall(join_pattern, queries, re.IGNORECASE)
+
+    # Normaliser les noms des tables en majuscules
+    tables = [table.upper() for table in tables]
+
+    # Supprimer les doublons
+    tables = list(set(tables))
+
+    return tables
+
+def extract_hive_table_and_queries(conf_dir):
+    """"
+  permet d'extraire pour chaque fichier conf la table rdms et hive
+    """
+    results = {}
+    #total_rdms_tables = set()
+    #total_hive_tables = set()
+
+    try:
+        for root, dirs, files in os.walk(conf_dir):
+            for file in files:
+                if file.lower().startswith('sqoop-export-spark') and file.lower().endswith('.conf'):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                    except Exception as e:
+                        print(f"Erreur lors de la lecture du fichier {file_path}: {e}")
+                        continue
+
+                    rdms_pattern = re.compile(r'flux\.rdms\.pre-exec-queries\s*\+=\s*""".*?FROM\s+(\S+)\s+WHERE', re.IGNORECASE | re.DOTALL)
+                    rdms_match = rdms_pattern.search(content)
+                    if rdms_match:
+                        rdms_table = rdms_match.group(1)
+                        hive_pattern = re.compile(r'flux\.hive\.pre-exec-queries\s*\+=\s*""".*?FROM\s+(\S+)\s+WHERE', re.IGNORECASE | re.DOTALL)
+                        hive_match = hive_pattern.search(content)
+
+                        if hive_match:
+                            hive_table = hive_match.group(1)
+                        else:
+                            print(f"Aucune table Hive trouvée dans {file_path}")
+                            hive_table = None
+                    else:
+                        print(f"Aucune table RDMS trouvée dans {file_path}")
+                        rdms_table = None
+                        hive_table = None
+
+                    # Extraire les tables des requêtes SQL
+                    tables_rdms = extract_tables_from_queries(rdms_match.group(0) if rdms_match else "")
+                    tables_hive = extract_tables_from_queries(hive_match.group(0) if hive_match else "")
+
+                    results[file_path] = {
+                        "table_data_rdms": tables_rdms,
+                        "table_data_hive": tables_hive
+                    }
+
+                    # Ajouter les tables aux ensembles globaux
+                    #total_rdms_tables.update(tables_rdms)
+                    #total_hive_tables.update(tables_hive)
+    except Exception as e:
+        print(f"Erreur lors de la recherche des fichiers dans {conf_dir}: {e}")
+
+    return results
+
+
+
+    
 
 def extract_data_sources(hql_file_path):
     """
+    Permet de lire un fichier HQL et d'en extraire ses tables.
 
-    permet de lire un fichier hql et d'en extraire ces tables
-
-    retourne: la table principale et ses tables dépendantes
+    Retourne: la table principale et ses tables dépendantes.
     """
     try:
         # Lire le contenu du fichier HQL
@@ -96,7 +173,7 @@ def extract_data_sources(hql_file_path):
     table_pattern = r'\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b'
     join_pattern = r'\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b'
     database_pattern = r'\bUSE\s+([a-zA-Z_][a-zA-Z0-9_]*)\b'
-    insert_into_pattern = r'\bINSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b'
+    insert_into_pattern = r'\bINSERT\s+INTO\s+(?:(TABLE\s+)?([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*))\b'
 
     # Trouver toutes les occurrences des motifs
     tables_from = re.findall(table_pattern, hql_content, re.IGNORECASE)
@@ -106,16 +183,21 @@ def extract_data_sources(hql_file_path):
     # Combiner les tables trouvées dans FROM et JOIN
     tables = tables_from + tables_join
 
-    for i in range(len(tables)):
-        tables[i]=tables[i].upper()
+    # Normaliser les noms des tables en majuscules
+    tables = [table.upper() for table in tables]
 
     # Supprimer les doublons
     tables = list(set(tables))
 
-    
     # Identifier la table principale
-    main_table = insert_into_tables[0] if insert_into_tables else None
+    main_table = None
+    if insert_into_tables:
+        for match in insert_into_tables:
+            if match[1]:  # Utiliser la deuxième capture (le nom de la table)
+                main_table = match[1].upper()
+                break
 
+    # Enlever la table principale de la liste des tables
     if main_table and main_table in tables:
         tables.remove(main_table)
 
@@ -159,56 +241,8 @@ def extract_table_names_from_load_conf_files(file_queries):
 
     return dic_load
 
-def find_dependencies_(hql_file_path, dependency_map, file_queries):
-    """
-    Fonction récursive pour trouver les dépendances de chaque table dépendante.
-
-    Retourne: Un dictionnaire de dépendances.
-    """
-    tables, main_table = extract_data_sources(hql_file_path)
-
-    if main_table:
-        dependency_map[main_table] = tables
-        for table in tables:
-            # Rechercher le fichier HQL correspondant à la table dépendante
-            dependent_file_path = None
-            for query_files in file_queries.values():
-                for query_file in query_files:
-                    with open(query_file, 'r') as file:
-                        content = file.read()
-                        recherche=re.search(r'\bINSERT\s+INTO\s+' + re.escape(table) + r'\b', content, re.IGNORECASE)
-                        print("recherche de l'expression:",recherche)
-                        if re.search(r'\bINSERT\s+INTO\s+' + re.escape(table) + r'\b', content, re.IGNORECASE):
-                            dependent_file_path = query_file
-                            break
-                if dependent_file_path:
-                    break
-
-            if dependent_file_path and os.path.exists(dependent_file_path):
-                find_dependencies(dependent_file_path, dependency_map, file_queries)
-
-    return dependency_map
-
-def extract_table_names_from_load_conf_files_(file_queries):
-    """
-    Extrait le nom des tables dans les requêtes de la forme INSERT INTO
-    pour les fichiers .conf possédant 'load' dans leur nom.
-    """
-    dic_load = {}
-    for key, value in file_queries.items():
-        if "load" in key:
-            for query_file in value:
-                if "insert" in query_file.lower():
-                    dependencies, main_table = extract_data_sources(query_file)
-                    if main_table:
-                        dic_load[main_table] = dependencies
-                        # Trouver les dépendances récursives
-                        dependency_map = {}
-                        find_dependencies(query_file, dependency_map, file_queries)
-                        dic_load[main_table].extend(dependency_map.get(main_table, []))
-
-    return dic_load
-
+def map_rdms_file_hql_fil(dic_rdms_hive):
+    "retourne un dictionnaire avec en clé le nom de la table hive et en valeur le chemin de son hql, à faire "
 
 
 def generate_excel(dependency_map, output_file):
