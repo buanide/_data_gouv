@@ -150,9 +150,48 @@ def extract_hive_table_and_queries(conf_dir):
 
     return results
 
-
-
+def map_rdms_file_hql_file(dic_rdms_hive,list_paths_scripts_hql):
+    """"
     
+    retourne un dictionnaire avec en clé le nom de la table hive et en valeur le chemin de son hql, à faire 
+    dic_rdms_hive(dic): contient en clé le chemin du fichier conf et en valeur une clé menant au nom de la table rdms et 
+    une clé menant au nom de sa table hive
+    list_paths_scripts_hql(list): vontient la liste de tus les scripts hql
+
+    """  
+
+    dic={}
+    for key, value in dic_rdms_hive.items():
+              for file_path in list_paths_scripts_hql:
+                   if "insert_into" in file_path:
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                        hql_content = f.read()
+                        except Exception as e:
+                            print(f"Erreur lors de la lecture du fichier {file_path}: {e}, function map_rdms_file_hql_file ")
+                            return []
+                        
+                        insert_into_pattern = r'\bINSERT\s+INTO\s+(?:(TABLE\s+)?([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*))\b'
+                        insert_into_tables = re.findall(insert_into_pattern, hql_content, re.IGNORECASE)
+                        #print("chmin",i)
+    
+                       
+
+                        main_table = None
+                        if insert_into_tables:
+                            for match in insert_into_tables:
+                                if match[1]:  # Utiliser la deuxième capture (le nom de la table)
+                                    main_table = match[1].upper()
+                                    break
+                                     
+                        if main_table and value["table_data_hive"]:
+                            if main_table==value["table_data_hive"][0]: 
+                            #print("ok")
+                                dic[main_table]=file_path
+        
+    return dic
+    
+        
 
 def extract_data_sources(hql_file_path):
     """
@@ -165,7 +204,7 @@ def extract_data_sources(hql_file_path):
         with open(hql_file_path, 'r') as file:
             hql_content = file.read()
     except FileNotFoundError:
-        print(f"Erreur : Le fichier '{hql_file_path}' n'a pas été trouvé.")
+        print(f"Erreur : Le fichier '{hql_file_path}' n'a pas été trouvé, fonction extract_data_sources")
         return [], None
 
     # Utiliser des expressions régulières pour trouver les sources de données
@@ -222,6 +261,21 @@ def find_dependencies(hql_file_path, dependency_map,list_paths_conf_files):
 
     return dependency_map
 
+def extract_tables_from_hql(dic_name_table_hql_path):
+    """
+    dic_name_table_hql_path(dic): dictionnaire avec en clé le nom de la table au data lake et le chemin du .hql qui l'alimente
+    extrait les dépendances d'une du datalake à partir du chemin de son .hql
+    retourne un dictionnaire avec en clé le nom de la table principale et en valeurs ses dépendances 
+    """
+    dic_load={}
+    for i,path in dic_name_table_hql_path.items():
+        dependances,table=extract_data_sources(path)
+        dic_load[table]=dependances
+
+    return dic_load
+
+
+
 
 def extract_table_names_from_load_conf_files(file_queries):
     """
@@ -241,8 +295,7 @@ def extract_table_names_from_load_conf_files(file_queries):
 
     return dic_load
 
-def map_rdms_file_hql_fil(dic_rdms_hive):
-    "retourne un dictionnaire avec en clé le nom de la table hive et en valeur le chemin de son hql, à faire "
+
 
 
 def generate_excel(dependency_map, output_file):
@@ -298,6 +351,63 @@ def generate_excel(dependency_map, output_file):
     # Créer le DataFrame final
     df = pd.DataFrame(rows, columns=columns)
     df.to_excel(output_file, index=False)
+
+
+
+def generate_excel_with_rdms_and_dependencies(results, dependency_map, output_file):
+    """
+    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, cycles inclus.
+
+    Args:
+        results (dict): Dictionnaire contenant les associations RDMS et Hive.
+        dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.
+        output_file (str): Chemin du fichier Excel de sortie.
+    """
+    # Liste pour stocker les lignes de données
+    rows = []
+
+    def process_table(table, dependency_path):
+        """
+        Récursivement, ajoute les dépendances Hive dans la liste des lignes, y compris les cycles.
+
+        Args:
+            table (str): Table principale ou dépendance à traiter.
+            dependency_path (list): Chemin des dépendances accumulées.
+        """
+        # Ajouter une ligne pour la table courante et son chemin
+        row = dependency_path + [table]
+        rows.append(row)
+        
+        # Continuer avec les dépendances si elles existent
+        if table in dependency_map:
+            for dep in dependency_map[table]:
+                process_table(dep, row)  # Pas de vérification des cycles ici
+
+    # Traitement des associations RDMS -> Hive et dépendances Hive
+    for file_path, table_info in results.items():
+        tables_rdms = table_info.get("table_data_rdms", [])
+        tables_hive = table_info.get("table_data_hive", [])
+        
+        for rdms_table in tables_rdms:
+            for hive_table in tables_hive:
+                # Ajouter la relation RDMS -> Hive
+                rows.append([rdms_table, hive_table])
+                
+                # Ajouter les dépendances Hive pour cette table Hive
+                if hive_table in dependency_map:
+                    process_table(hive_table, [rdms_table, hive_table])
+    
+    # Déterminer le nombre maximum de colonnes
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns - 2)]
+    
+    # Créer un DataFrame avec les données collectées
+    df = pd.DataFrame(rows, columns=columns)
+    
+    # Exporter le DataFrame vers un fichier Excel
+    df.to_excel(output_file, index=False)
+    print(f"Fichier Excel généré avec succès : {output_file}")
+
    
                       
 
