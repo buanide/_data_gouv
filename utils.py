@@ -6,8 +6,7 @@ def list_all_files(directory):
     """
     Retourne tous les chemins de fichiers dans un répertoire, y compris les sous-répertoires.
     """
-    print("a")
-    print("repertoire",directory)
+    
     file_paths = []
     for root, dirs, files in os.walk(directory):
         for file in files:
@@ -153,7 +152,7 @@ def extract_hive_table_and_queries(conf_dir):
 def map_rdms_file_hql_file(dic_rdms_hive,list_paths_scripts_hql):
     """"
     
-    retourne un dictionnaire avec en clé le nom de la table hive et en valeur le chemin de son hql, à faire 
+    retourne un dictionnaire avec en clé le nom de la table hive et en valeur le chemin de son hql
     dic_rdms_hive(dic): contient en clé le chemin du fichier conf et en valeur une clé menant au nom de la table rdms et 
     une clé menant au nom de sa table hive
     list_paths_scripts_hql(list): vontient la liste de tus les scripts hql
@@ -163,7 +162,7 @@ def map_rdms_file_hql_file(dic_rdms_hive,list_paths_scripts_hql):
     dic={}
     for key, value in dic_rdms_hive.items():
               for file_path in list_paths_scripts_hql:
-                   if "insert_into" in file_path:
+                   if "insert" or "compute" in file_path:
                         try:
                             with open(file_path, 'r', encoding='utf-8') as f:
                                         hql_content = f.read()
@@ -174,9 +173,6 @@ def map_rdms_file_hql_file(dic_rdms_hive,list_paths_scripts_hql):
                         insert_into_pattern = r'\bINSERT\s+INTO\s+(?:(TABLE\s+)?([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*))\b'
                         insert_into_tables = re.findall(insert_into_pattern, hql_content, re.IGNORECASE)
                         #print("chmin",i)
-    
-                       
-
                         main_table = None
                         if insert_into_tables:
                             for match in insert_into_tables:
@@ -242,38 +238,31 @@ def extract_data_sources(hql_file_path):
 
     return tables, main_table
 
-def find_dependencies(hql_file_path, dependency_map,list_paths_conf_files):
-    """
-    Fonction récursive pour trouver les dépendances de chaque table dépendante.
 
-    Retourne: Un dictionnaire de dépendances.
+def extract_tables_from_hql(dic_name_table_hql_path): 
     """
-    tables, main_table = extract_data_sources(hql_file_path)
-
-    if main_table:
-        dependency_map[main_table] = tables
-        for table in tables:
-            for i in list_paths_conf_files:
-                    
-                dependent_file_path = f'path/to/your/{table}.hql'  # Remplacez par le chemin réel
-                if os.path.exists(dependent_file_path):
-                    find_dependencies(dependent_file_path, dependency_map)
-
-    return dependency_map
-
-def extract_tables_from_hql(dic_name_table_hql_path):
+    dic_name_table_hql_path (dict): Dictionnaire avec en clé le nom de la table HIVE 
+                                    et en valeur le chemin du .hql qui l'alimente.
+    extrait les dépendances du datalake à partir du chemin de son .hql.
+    retourne un dictionnaire avec en clé le nom de la table principale HIVE 
+    et en valeur une liste de toutes ses dépendances, en conservant l'ordre 
+    sans doublons.
     """
-    dic_name_table_hql_path(dic): dictionnaire avec en clé le nom de la table au data lake et le chemin du .hql qui l'alimente
-    extrait les dépendances d'une du datalake à partir du chemin de son .hql
-    retourne un dictionnaire avec en clé le nom de la table principale et en valeurs ses dépendances 
-    """
-    dic_load={}
-    for i,path in dic_name_table_hql_path.items():
-        dependances,table=extract_data_sources(path)
-        dic_load[table]=dependances
+    dic_load = {}
+
+    for table_hive, path in dic_name_table_hql_path.items():
+        # Extraire les dépendances et le nom de la table HIVE depuis le fichier HQL
+        dependances, table = extract_data_sources(path)
+        
+        # Si la table est déjà dans dic_load, ajouter les nouvelles dépendances tout en évitant les doublons
+        if table in dic_load:
+            for dep in dependances:
+                if dep not in dic_load[table]:  # Vérifie manuellement les doublons
+                    dic_load[table].append(dep)
+        else:
+            dic_load[table] = dependances[:]  # Copie de la liste pour éviter les références mutuelles
 
     return dic_load
-
 
 
 
@@ -352,6 +341,66 @@ def generate_excel(dependency_map, output_file):
     df = pd.DataFrame(rows, columns=columns)
     df.to_excel(output_file, index=False)
 
+def generate_excel_with_rdms_and_dependencies_2(rdms_hive_map, dependency_map, output_file):
+    """
+    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, cycles inclus.
+
+    Args:
+        rdms_hive_map (dict): Dictionnaire contenant les associations RDMS et Hive.
+        dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.
+        output_file (str): Chemin du fichier Excel de sortie.
+    """
+    # Liste pour stocker les lignes de données
+    rows = []
+
+    def process_table(table, dependency_path, visited_tables):
+        """
+        Récursivement, ajoute les dépendances Hive dans la liste des lignes, y compris les cycles.
+
+        Args:
+            table (str): Table principale ou dépendance à traiter.
+            dependency_path (list): Chemin des dépendances accumulées.
+            visited_tables (set): Ensemble des tables déjà visitées pour éviter les boucles.
+        """
+        # Si la table est déjà visitée, éviter la récursion infinie
+        if table in visited_tables:
+            return
+
+        # Ajouter la table actuelle au chemin de dépendance
+        visited_tables.add(table)
+
+        # Ajouter une ligne pour la table courante et son chemin de dépendance
+        current_row = dependency_path + [table]
+        rows.append(current_row)
+
+        # Si la table a des dépendances, continuer récursivement
+        for i, value in dependency_map.items():
+            if table==i:
+                for dep in dependency_map[table]:
+                    process_table(dep, current_row, visited_tables.copy())
+
+    # Traitement des associations RDMS -> Hive et dépendances Hive
+    for rdms_table, hive_table in rdms_hive_map.items():
+        # Ajouter la relation RDMS -> Hive en tant que ligne de base
+        rows.append([rdms_table, hive_table])
+
+        # Ajouter les dépendances Hive pour cette table Hive
+        for table_hive, dependances in dependency_map.items():
+            if hive_table == table_hive:
+                process_table(hive_table, dependances, set())
+
+    # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns - 2)]
+
+    # Créer un DataFrame avec les données collectées
+    df = pd.DataFrame(rows, columns=columns)
+
+    # Exporter le DataFrame vers un fichier Excel
+    df.to_excel(output_file, index=False)
+    print(f"Fichier Excel généré avec succès : {output_file}")
+
+
 
 
 def generate_excel_with_rdms_and_dependencies(results, dependency_map, output_file):
@@ -374,30 +423,29 @@ def generate_excel_with_rdms_and_dependencies(results, dependency_map, output_fi
             table (str): Table principale ou dépendance à traiter.
             dependency_path (list): Chemin des dépendances accumulées.
         """
-        # Ajouter une ligne pour la table courante et son chemin
-        row = dependency_path + [table]
-        rows.append(row)
+        # Crée une nouvelle ligne avec la dépendance actuelle
+        current_row = dependency_path + [table]
+        rows.append(current_row)
         
         # Continuer avec les dépendances si elles existent
         if table in dependency_map:
             for dep in dependency_map[table]:
-                process_table(dep, row)  # Pas de vérification des cycles ici
+                process_table(dep, current_row)  # Pas de vérification des cycles ici
 
     # Traitement des associations RDMS -> Hive et dépendances Hive
     for file_path, table_info in results.items():
         tables_rdms = table_info.get("table_data_rdms", [])
         tables_hive = table_info.get("table_data_hive", [])
-        
         for rdms_table in tables_rdms:
             for hive_table in tables_hive:
-                # Ajouter la relation RDMS -> Hive
+                # Ajouter la relation RDMS -> Hive en tant que ligne de base
                 rows.append([rdms_table, hive_table])
                 
                 # Ajouter les dépendances Hive pour cette table Hive
                 if hive_table in dependency_map:
-                    process_table(hive_table, [rdms_table, hive_table])
-    
-    # Déterminer le nombre maximum de colonnes
+                    process_table(hive_table, [rdms_table])
+
+    # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
     max_columns = max(len(row) for row in rows)
     columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns - 2)]
     
@@ -407,12 +455,3 @@ def generate_excel_with_rdms_and_dependencies(results, dependency_map, output_fi
     # Exporter le DataFrame vers un fichier Excel
     df.to_excel(output_file, index=False)
     print(f"Fichier Excel généré avec succès : {output_file}")
-
-   
-                      
-
-
-
-
-    
-    
