@@ -95,6 +95,9 @@ def extract_tables_from_queries(queries):
 
     return tables
 
+
+
+
 def extract_hive_table_and_queries(conf_dir):
     """"
   permet d'extraire pour chaque fichier conf la table rdms et hive
@@ -146,16 +149,14 @@ def extract_hive_table_and_queries(conf_dir):
                     #total_hive_tables.update(tables_hive)
     except Exception as e:
         print(f"Erreur lors de la recherche des fichiers dans {conf_dir}: {e}")
-
     return results
 
 def map_rdms_file_hql_file(dic_rdms_hive,list_paths_scripts_hql):
     """"
     
     retourne un dictionnaire avec en clé le nom de la table hive et en valeur le chemin de son hql
-    dic_rdms_hive(dic): contient en clé le chemin du fichier conf et en valeur une clé menant au nom de la table rdms et 
-    une clé menant au nom de sa table hive
-    list_paths_scripts_hql(list): vontient la liste de tus les scripts hql
+    dic_rdms_hive(dic): en clé le nom de la table et en valeur le chemin du fichier
+    list_paths_scripts_hql(list): contient la liste de tous les scripts hql
 
     """  
 
@@ -239,30 +240,19 @@ def extract_data_sources(hql_file_path):
     return tables, main_table
 
 
-def extract_tables_from_hql(dic_name_table_hql_path): 
+def extract_tables_from_hql(dic_name_table_hql_path):
     """
-    dic_name_table_hql_path (dict): Dictionnaire avec en clé le nom de la table HIVE 
-                                    et en valeur le chemin du .hql qui l'alimente.
-    extrait les dépendances du datalake à partir du chemin de son .hql.
-    retourne un dictionnaire avec en clé le nom de la table principale HIVE 
-    et en valeur une liste de toutes ses dépendances, en conservant l'ordre 
-    sans doublons.
+    dic_name_table_hql_path(dic): dictionnaire avec en clé le nom de la table HIVE et le chemin du .hql qui l'alimente
+    extrait les dépendances d'une du datalake à partir du chemin de son .hql
+    retourne un dictionnaire avec en clé le nom de la table principale hive et en valeurs ses dépendances 
     """
-    dic_load = {}
-
-    for table_hive, path in dic_name_table_hql_path.items():
-        # Extraire les dépendances et le nom de la table HIVE depuis le fichier HQL
-        dependances, table = extract_data_sources(path)
-        
-        # Si la table est déjà dans dic_load, ajouter les nouvelles dépendances tout en évitant les doublons
-        if table in dic_load:
-            for dep in dependances:
-                if dep not in dic_load[table]:  # Vérifie manuellement les doublons
-                    dic_load[table].append(dep)
-        else:
-            dic_load[table] = dependances[:]  # Copie de la liste pour éviter les références mutuelles
+    dic_load={}
+    for i,path in dic_name_table_hql_path.items():
+        dependances,table=extract_data_sources(path)
+        dic_load[table]=dependances
 
     return dic_load
+
 
 
 
