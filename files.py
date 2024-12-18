@@ -25,6 +25,8 @@ if __name__ == "__main__":
     
     #lecture des chemins des tous les scripts
     lists_paths_scripts=list_all_files(scripts_dir)
+
+    
     #a=chains[0]
     #file_queries=extract_pre_exec_and_exec_queries_by_file(chains,root_dir)
     """
@@ -42,139 +44,83 @@ if __name__ == "__main__":
     dic_tables_hive_paths=map_rdms_file_hql_file(dic_rdms_hive,lists_paths_scripts)
     dic_hive_depandances=extract_tables_from_hql(dic_tables_hive_paths)
 
+    #for i, value in dic_tables_hive_paths.items():
+     #   print("table",i)
+
+
+
     #output_file = "dependencies_2.xlsx"
 
-
+    generate_excel_with_rdms_and_dependencies(dic_rdms_hive, dic_hive_depandances, "output_file_with_cycles.xlsx")
 
 def allo(dic_hive_depandances, dic_tables_hive_paths, dic_rdms_hive): 
     """
-    Met à jour le dictionnaire des dépendances Hive en ajoutant de nouvelles clés 
-    pour les tables Hive correspondantes aux tables RDMS, si elles n'existent pas déjà.
+    Met à jour le dictionnaire des dépendances Hive. Ajoute de nouvelles tables en tant que clés, 
+    extrait les dépendances depuis leurs fichiers HQL si disponibles, ou laisse la liste vide.
 
     Args:
-        dic_hive_depandances (dict): 
-            Dictionnaire des dépendances Hive. 
-            Clés : noms des tables Hive. 
-            Valeurs : listes de dépendances associées (tables RDMS ou Hive).
-            
-            Exemple :
-            {
-                "AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY": ["MON.FT_REFILL", "MON.FT_MISSING"]
-            }
-        
-        dic_tables_hive_paths (dict): 
-            Dictionnaire associant les tables Hive à leurs chemins de fichiers HQL.
-            Clés : noms des tables Hive. 
-            Valeurs : chemins des fichiers.
-            
-            Exemple :
-            {
-                "MON.SPARK_FT_REFILL": "/path/to/file1",
-                "MON.SPARK_FT_OTHER": "/path/to/file2"
-            }
-        
-        dic_rdms_hive (dict): 
-            Dictionnaire associant des chemins de fichiers à des correspondances RDMS -> Hive.
-            Clés : chemins de fichiers (str).
-            Valeurs : dictionnaires avec les clés "table_data_rdms" (list) et "table_data_hive" (list).
-            
-            Exemple :
-            {
-                "path1": {"table_data_rdms": ["MON.FT_REFILL"], "table_data_hive": ["MON.SPARK_FT_REFILL"]},
-                "path2": {"table_data_rdms": ["MON.FT_OTHER"], "table_data_hive": ["MON.SPARK_FT_OTHER"]}
-            }
-
+        dic_hive_depandances (dict): Dictionnaire des dépendances Hive.
+        dic_tables_hive_paths (dict): Dictionnaire associant les tables Hive à leurs chemins de fichiers HQL.
+        dic_rdms_hive (dict): Dictionnaire associant des chemins de fichiers à des correspondances RDMS -> Hive.
+       
     Returns:
-        dict: 
-            Dictionnaire mis à jour des dépendances Hive. 
-            Les nouvelles tables Hive trouvées sont ajoutées comme clés, avec une liste vide comme valeur.
-            
-            Exemple de sortie :
-            {
-                "AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY": ["MON.FT_REFILL", "MON.FT_MISSING"],
-                "MON.SPARK_FT_REFILL": []
-            }
-
-    Fonctionnement :
-    - Parcourt les dépendances de chaque table Hive dans `dic_hive_depandances`.
-    - Pour chaque dépendance (table RDMS) :
-        1. Recherche son équivalent Hive dans `dic_rdms_hive`.
-        2. Si un équivalent Hive est trouvé et qu'il n'est pas déjà une clé dans `dic_hive_depandances` :
-           - Ajoute cette table Hive comme nouvelle clé avec une liste vide comme dépendance initiale.
-    - Renvoie le dictionnaire mis à jour.
-
-    Exemple d'utilisation :
-    >>> dic_hive_depandances = {
-            "AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY": ["MON.FT_REFILL", "MON.FT_MISSING"]
-        }
-    >>> dic_tables_hive_paths = {
-            "MON.SPARK_FT_REFILL": "/path/to/file1",
-            "MON.SPARK_FT_OTHER": "/path/to/file2"
-        }
-    >>> dic_rdms_hive = {
-            "path1": {"table_data_rdms": ["MON.FT_REFILL"], "table_data_hive": ["MON.SPARK_FT_REFILL"]},
-            "path2": {"table_data_rdms": ["MON.FT_OTHER"], "table_data_hive": ["MON.SPARK_FT_OTHER"]}
-        }
-    >>> updated_dic = allo(dic_hive_depandances, dic_tables_hive_paths, dic_rdms_hive)
-    >>> print(updated_dic)
-    {
-        "AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY": ["MON.FT_REFILL", "MON.FT_MISSING"],
-        "MON.SPARK_FT_REFILL": []
-    }
+        dict: Dictionnaire mis à jour des dépendances Hive.
     """
-    liste_path_hive = []
+    # Créer une copie des clés du dictionnaire pour éviter des erreurs de modification pendant l'itération
+    keys_copy = list(dic_hive_depandances.keys())
     
-    # Parcourir les dépendances Hive
-    for table_hive, dependencies in dic_hive_depandances.items():
-        if table_hive == "AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY":
-            print(f"Table Hive principale : {table_hive}")
-            
-            # Parcourir les dépendances de cette table
-            for table_rdms in dependencies:
-                if "spark" not in table_rdms.lower():
-                    print(f"\nTable RDMS actuelle : {table_rdms}")
+    for table_hive in keys_copy:
+        dependencies = dic_hive_depandances[table_hive]
+
+        for i in dependencies:
+            if "spark" not in i.lower():
+                print(f"\nTable actuelle : {i}")
+                correspondance_trouvee = False  # Flag pour vérifier si une correspondance est trouvée
+                
+                # Rechercher la correspondance RDMS -> Hive
+                for path, value in dic_rdms_hive.items():
+                    rdms_tables = value.get("table_data_rdms", [])
+                    hive_tables = value.get("table_data_hive", [])
                     
-                    # Rechercher la correspondance RDMS -> Hive dans dic_rdms_hive
-                    found = False
-                    for path, value in dic_rdms_hive.items():
-                        rdms_tables = value.get("table_data_rdms", [])
-                        hive_tables = value.get("table_data_hive", [])
+                    if i in rdms_tables:
+                        correspondance_trouvee = True
+                        print(f"Équivalent trouvé : {i} -> {hive_tables}")
                         
-                        # Vérifier si la table RDMS est dans les clés correspondantes
-                        if table_rdms in rdms_tables:
-                            print(f"Équivalent trouvé : {table_rdms} -> {hive_tables}")
-                            
-                            # Vérifier si les tables Hive existent déjà dans dic_hive_depandances
-                            for hive_table in hive_tables:
-                                if hive_table not in dic_hive_depandances:
-                                    # Ajouter la nouvelle clé avec une liste vide
-                                    dic_hive_depandances[hive_table] = []
-                                    print(f"Nouvelle clé ajoutée : {hive_table} avec une liste vide.")
-                                
-                            found = True
-                            break
+                        for hive_table in hive_tables:
+                            if hive_table not in dic_hive_depandances:
+                                dic_hive_depandances[hive_table] = []
+                                print(f"Nouvelle clé ajoutée : {hive_table} avec une liste vide.")
+                
+                if not correspondance_trouvee:
+                    # Ajouter la table hive elle-même comme clé si elle n'existe pas
+                    if i not in dic_hive_depandances:
+                        dic_hive_depandances[i] = []
+                        print(f"Table sans correspondance ajoutée : {i} avec une liste vide.")
                     
-                    if not found:
-                        print(f"Aucune correspondance trouvée pour {table_rdms} dans dic_rdms_hive")
+                    # Rechercher le fichier HQL associé à cette table
+                    if i in dic_tables_hive_paths:
+                        hql_file_path = dic_tables_hive_paths[i]
+                        print(f"Chemin HQL trouvé pour {i} : {hql_file_path}")
                         
+                        # Utiliser la fonction extract_data_sources pour extraire les dépendances
+                        _, dependent_tables = extract_data_sources(hql_file_path)
+                        
+                        # Ajouter les tables dépendantes à la liste
+                        dic_hive_depandances[i].extend(dependent_tables)
+                        print(f"Dépendances ajoutées pour {i} : {dependent_tables}")
+                    else:
+                        print(f"Aucun fichier HQL trouvé pour {i}. La liste reste vide.")
+    
     return dic_hive_depandances
 
+    
 
 
 
-l=allo(dic_hive_depandances,dic_tables_hive_paths,dic_rdms_hive)
-
-     
-
+#l=allo(dic_hive_depandances,dic_tables_hive_paths,dic_rdms_hive)
 # Appel de la fonction et affichage des résultats
 
 
-for i, value in l.items():
-    if i == "AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY":
-        print("table hive", i)
-        print("tables", value)
-
-                
 
 
     #generate_excel_with_rdms_and_dependencies(dic_rdms_hive,dic_hive_depandances,output_file)
@@ -189,8 +135,7 @@ for i, value in l.items():
     
 
     #dic_rdm_hives=extract_hive_table_and_queries(conf_dir)
-    #generate_excel_with_rdms_and_dependencies(dic_hive_rdms, dic_hive_depandances, "output_file_with_cycles.xlsx")
-
+    
 
     #for i, value in dic_tables_hive_paths.items():
     #    print(i,"table","path",value)
