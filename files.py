@@ -7,6 +7,7 @@ from utils import extract_hive_table_and_queries
 from utils import map_rdms_file_hql_file
 from utils import extract_tables_from_hql
 from utils import generate_excel_with_rdms_and_dependencies
+from utils import generate_excel_with_rdms_and_dependencies_2
 from utils import extract_data_sources
 
 
@@ -31,11 +32,7 @@ if __name__ == "__main__":
     dic_hive_depandances=extract_tables_from_hql(dic_tables_hive_paths)
 
 
-    generate_excel_with_rdms_and_dependencies(dic_rdms_hive, dic_hive_depandances, "output_file_with_cycles.xlsx")
-
-
-
-
+    generate_excel_with_rdms_and_dependencies_2(dic_rdms_hive, dic_hive_depandances, "output_file_with_cycles.xlsx")
     #generate_excel_with_rdms_and_dependencies(dic_rdms_hive,dic_hive_depandances,output_file)
     #dependency_chain = build_dependency_chain(dic_rdms_hive, dic_hive_depandances)
     # Affichage du dictionnaire de dépendances avant l'aplatissement

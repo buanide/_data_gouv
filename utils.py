@@ -430,6 +430,72 @@ def generate_excel_with_rdms_and_dependencies(results, dependency_map, output_fi
     df.to_excel(output_file, index=False)
     print(f"Fichier Excel généré avec succès : {output_file}")
 
+def generate_excel_with_rdms_and_dependencies_2(results, dependency_map, output_file):
+    """
+    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, en évitant les cycles
+    et en supprimant les doublons.
+
+    Args:
+        results (dict): Dictionnaire contenant les associations RDMS et Hive.
+        dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.     
+        output_file (str): Chemin du fichier Excel de sortie.
+    """
+    # Liste pour stocker les chaînes uniques de dépendances
+    unique_paths = set()
+
+    def process_table(table, dependency_path, visited):
+        """
+        Récursivement, ajoute les dépendances Hive dans la liste des chaînes uniques tout en évitant les cycles.
+
+        Args:
+            table (str): Table principale ou dépendance à traiter.
+            dependency_path (list): Chemin des dépendances accumulées.
+            visited (set): Ensemble des tables déjà visitées dans cette branche de récursion.
+        """
+        if table in visited:
+            # Cycle détecté, ajouter une indication de cycle et arrêter cette branche
+            unique_paths.add(tuple(dependency_path + [f"{table} (cycle détecté)"]))
+            return
+
+        # Marquer cette table comme visitée
+        visited.add(table)
+
+        # Ajouter la dépendance actuelle comme chaîne unique
+        current_path = dependency_path + [table]
+        unique_paths.add(tuple(current_path))
+
+        # Continuer avec les dépendances si elles existent
+        if table in dependency_map:
+            for dep in dependency_map[table]:
+                process_table(dep, current_path, visited.copy())  # Passer une copie pour chaque branche
+
+    # Traitement des associations RDMS -> Hive et dépendances Hive
+    for file_path, table_info in results.items():
+        tables_rdms = table_info.get("table_data_rdms", [])
+        tables_hive = table_info.get("table_data_hive", [])
+        for rdms_table in tables_rdms:
+            for hive_table in tables_hive:
+                # Ajouter la relation RDMS -> Hive comme point de départ
+                unique_paths.add((rdms_table, hive_table))
+
+                # Ajouter les dépendances Hive pour cette table Hive
+                if hive_table in dependency_map:
+                    process_table(hive_table, [rdms_table], set())  # Initialiser "visited" comme un ensemble vide
+
+    # Convertir les chemins uniques en lignes pour le DataFrame
+    rows = [list(path) for path in unique_paths]
+
+    # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns - 2)]
+
+    # Créer un DataFrame avec les données collectées
+    df = pd.DataFrame(rows, columns=columns)
+
+    # Exporter le DataFrame vers un fichier Excel
+    df.to_excel(output_file, index=False)
+    print(f"Fichier Excel généré avec succès : {output_file}")
+
 
 
 def allo(dic_hive_depandances, dic_tables_hive_paths, dic_rdms_hive): 
