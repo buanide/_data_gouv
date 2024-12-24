@@ -1,6 +1,8 @@
 import os
 import re
 import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 
 def list_all_files(directory):
     """
@@ -430,44 +432,48 @@ def generate_excel_with_rdms_and_dependencies(results, dependency_map, output_fi
     df.to_excel(output_file, index=False)
     print(f"Fichier Excel généré avec succès : {output_file}")
 
-def generate_excel_with_rdms_and_dependencies_2(results, dependency_map, output_file):
-    """
-    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, en évitant les cycles
-    et en supprimant les doublons.
 
+
+
+def generate_excel_with_rdms_and_dependencies_3(results, dependency_map, output_file):
+    """
+    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
     Args:
         results (dict): Dictionnaire contenant les associations RDMS et Hive.
         dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.     
         output_file (str): Chemin du fichier Excel de sortie.
     """
-    # Liste pour stocker les chaînes uniques de dépendances
+    # Liste pour stocker les chemins uniques de dépendances
     unique_paths = set()
 
-    def process_table(table, dependency_path, visited):
+    def get_all_dependencies(table, current_path, visited):
         """
-        Récursivement, ajoute les dépendances Hive dans la liste des chaînes uniques tout en évitant les cycles.
+        Explore toutes les dépendances d'une table en profondeur et ajoute chaque chemin unique.
 
         Args:
-            table (str): Table principale ou dépendance à traiter.
-            dependency_path (list): Chemin des dépendances accumulées.
-            visited (set): Ensemble des tables déjà visitées dans cette branche de récursion.
+            table (str): La table pour laquelle les dépendances doivent être explorées.
+            current_path (list): Le chemin courant (accumulé).
+            visited (set): Ensemble des tables déjà visitées pour éviter les cycles.
         """
         if table in visited:
-            # Cycle détecté, ajouter une indication de cycle et arrêter cette branche
-            unique_paths.add(tuple(dependency_path + [f"{table} (cycle détecté)"]))
+            # Cycle détecté, ajouter le chemin avec une indication
+            unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
             return
 
-        # Marquer cette table comme visitée
+        # Ajouter la table courante au chemin
+        current_path = current_path + [table]
+
+        # Si la table n'a pas de dépendances, ajouter le chemin complet
+        if table not in dependency_map or not dependency_map[table]:
+            unique_paths.add(tuple(current_path))
+            return
+
+        # Marquer la table comme visitée
         visited.add(table)
 
-        # Ajouter la dépendance actuelle comme chaîne unique
-        current_path = dependency_path + [table]
-        unique_paths.add(tuple(current_path))
-
-        # Continuer avec les dépendances si elles existent
-        if table in dependency_map:
-            for dep in dependency_map[table]:
-                process_table(dep, current_path, visited.copy())  # Passer une copie pour chaque branche
+        # Parcourir les dépendances et continuer l'exploration
+        for dependency in dependency_map[table]:
+            get_all_dependencies(dependency, current_path, visited.copy())
 
     # Traitement des associations RDMS -> Hive et dépendances Hive
     for file_path, table_info in results.items():
@@ -480,7 +486,7 @@ def generate_excel_with_rdms_and_dependencies_2(results, dependency_map, output_
 
                 # Ajouter les dépendances Hive pour cette table Hive
                 if hive_table in dependency_map:
-                    process_table(hive_table, [rdms_table], set())  # Initialiser "visited" comme un ensemble vide
+                    get_all_dependencies(hive_table, [rdms_table], set())
 
     # Convertir les chemins uniques en lignes pour le DataFrame
     rows = [list(path) for path in unique_paths]
@@ -492,10 +498,95 @@ def generate_excel_with_rdms_and_dependencies_2(results, dependency_map, output_
     # Créer un DataFrame avec les données collectées
     df = pd.DataFrame(rows, columns=columns)
 
+    df_unique=df.drop_duplicates()
+
     # Exporter le DataFrame vers un fichier Excel
-    df.to_excel(output_file, index=False)
+    df_unique.to_excel(output_file, index=False)
     print(f"Fichier Excel généré avec succès : {output_file}")
 
+
+    
+
+
+
+def compare_and_update(reference_file, verification_file, output_file):
+    """
+    Corrige un fichier Excel en se basant sur un fichier de référence :
+    - Seules les tables RDMS présentes dans le fichier à vérifier sont prises en compte.
+    - Les lignes du fichier à vérifier sont corrigées en fonction du fichier de référence.
+    - Les lignes corrigées ou ajoutées sont annotées dans les commentaires.
+
+    Args:
+        reference_file (str): Chemin du fichier de référence généré automatiquement.
+        verification_file (str): Chemin du fichier à vérifier.
+        output_file (str): Chemin du fichier Excel de sortie.
+    """
+    # Charger les fichiers Excel
+    df_ref = pd.read_excel(reference_file)
+    df_verif = pd.read_excel(verification_file)
+
+    # Convertir les colonnes en chaînes pour éviter des erreurs de type
+    df_ref = df_ref.astype(str).fillna("")
+    df_verif = df_verif.astype(str).fillna("")
+
+    # Initialiser le DataFrame pour la sortie
+    corrected_rows = []
+
+    # Filtrer les tables RDMS présentes dans le fichier à vérifier
+    rdms_tables = df_verif["Table_RDMS"].unique()
+
+    # Vérifier et corriger ligne par ligne
+    for table in rdms_tables:
+        # Extraire les lignes pour cette table dans les deux fichiers
+        ref_table = df_ref[df_ref["Table_RDMS"] == table]
+        verif_table = df_verif[df_verif["Table_RDMS"] == table]
+
+        for _, verif_row in verif_table.iterrows():
+            if not ((ref_table == verif_row).all(axis=1)).any():
+                # Ligne présente dans le fichier à vérifier mais incorrecte ou incomplète
+                matched_ref = ref_table[(ref_table["Table_RDMS"] == verif_row["Table_RDMS"]) & 
+                                        (ref_table["Table_Hive"] == verif_row["Table_Hive"])]
+                if not matched_ref.empty:
+                    # Compléter la ligne à partir de la référence
+                    corrected_row = matched_ref.iloc[0].tolist()
+                    if corrected_row not in corrected_rows:  # Ajouter seulement si unique
+                        corrected_rows.append(corrected_row + ["Corrigée (manquante ou incorrecte)"])
+                else:
+                    # Ligne totalement absente de la référence
+                    corrected_row = verif_row.tolist()
+                    if corrected_row not in corrected_rows:  # Ajouter seulement si unique
+                        corrected_rows.append(corrected_row + ["Non trouvée dans la référence"])
+            else:
+                # Ligne correcte
+                corrected_row = verif_row.tolist()
+                if corrected_row not in corrected_rows:  # Ajouter seulement si unique
+                    corrected_rows.append(corrected_row + ["OK"])
+
+    # Ajouter les colonnes de commentaires au fichier final
+    columns = list(df_verif.columns) + ["Commentaires"]
+    final_df = pd.DataFrame(corrected_rows, columns=columns)
+
+    # Sauvegarder dans le fichier Excel
+    final_df.to_excel(output_file, index=False, engine="openpyxl")
+    wb = load_workbook(output_file)
+    ws = wb.active
+
+    # Appliquer des styles pour la mise en évidence
+    green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Vert clair
+    red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # Rouge clair
+
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        comment_cell = row[-1]  # Dernière colonne (Commentaires)
+        if comment_cell.value == "Corrigée (manquante ou incorrecte)":
+            for cell in row:
+                cell.fill = green_fill
+        elif comment_cell.value == "Non trouvée dans la référence":
+            for cell in row:
+                cell.fill = red_fill
+
+    # Enregistrer le fichier avec la mise en forme
+    wb.save(output_file)
+    print(f"Fichier corrigé généré avec succès : {output_file}")
 
 
 def allo(dic_hive_depandances, dic_tables_hive_paths, dic_rdms_hive): 
