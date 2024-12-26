@@ -3,6 +3,7 @@ import re
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+from pathlib import Path
 
 def list_all_files(directory):
     """
@@ -154,58 +155,74 @@ def extract_hive_table_and_queries(conf_dir):
     return results
 
 
-def extract_dependencies_from_conf(conf_dir):
-    """"
-  permet d'extraire pour chaque fichier cses éventuelles dépendances
+def extract_exec_queries(file_path):
     """
-    results = {}
-    #total_rdms_tables = set()
-    #total_hive_tables = set()
+    Extrait les valeurs des variables flux.exec-queries et flux.pre-exec-queries dans un fichier de configuration.
+    Args:
+        file_path (str): Chemin du fichier de configuration.
+    Returns:
+        tuple: Deux listes contenant respectivement les valeurs de flux.pre-exec-queries et flux.exec-queries.
+    """
+    pre_exec_queries = []
+    exec_queries = []
 
     try:
-        for root, dirs, files in os.walk(conf_dir):
-            for file in files:
-                if not file.lower().startswith('sqoop-export-spark') and file.lower().endswith('.conf'):
-                    file_path = os.path.join(root, file)
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                    except Exception as e:
-                        print(f"Erreur lors de la lecture du fichier {file_path}: {e}")
-                        continue
+        with open(file_path, 'r') as file:
+            content = file.read()
 
-                    rdms_pattern = re.compile(r'flux\.rdms\.pre-exec-queries\s*\+=\s*""".*?FROM\s+(\S+)\s+WHERE', re.IGNORECASE | re.DOTALL)
-                    rdms_match = rdms_pattern.search(content)
-                    if rdms_match:
-                        rdms_table = rdms_match.group(1)
-                        hive_pattern = re.compile(r'flux\.hive\.pre-exec-queries\s*\+=\s*""".*?FROM\s+(\S+)\s+WHERE', re.IGNORECASE | re.DOTALL)
-                        hive_match = hive_pattern.search(content)
+            # Expression régulière pour flux.pre-exec-queries
+            pre_exec_matches = re.findall(r'flux\.pre-exec-queries\s*\+=\s*"([^"]+)"', content)
+            if pre_exec_matches:
+                pre_exec_queries.extend(query.strip() for query in pre_exec_matches)
 
-                        if hive_match:
-                            hive_table = hive_match.group(1)
-                        else:
-                            print(f"Aucune table Hive trouvée dans {file_path}")
-                            hive_table = None
-                    else:
-                        print(f"Aucune table RDMS trouvée dans {file_path}")
-                        rdms_table = None
-                        hive_table = None
+            # Expression régulière pour flux.exec-queries
+            exec_matches = re.findall(r'flux\.exec-queries\s*\+=\s*"([^"]+)"', content)
+            if exec_matches:
+                exec_queries.extend(query.strip() for query in exec_matches)
 
-                    # Extraire les tables des requêtes SQL
-                    tables_rdms = extract_tables_from_queries(rdms_match.group(0) if rdms_match else "")
-                    tables_hive = extract_tables_from_queries(hive_match.group(0) if hive_match else "")
-
-                    results[file_path] = {
-                        "table_data_rdms": tables_rdms,
-                        "table_data_hive": tables_hive
-                    }
-
-                    # Ajouter les tables aux ensembles globaux
-                    #total_rdms_tables.update(tables_rdms)
-                    #total_hive_tables.update(tables_hive)
     except Exception as e:
-        print(f"Erreur lors de la recherche des fichiers dans {conf_dir}: {e}")
-    return results
+        print(f"Erreur lors du traitement du fichier {file_path}: {e}")
+
+    return pre_exec_queries, exec_queries
+
+
+
+def process_conf_files(directory, dir_hdfs):
+    """
+    Parcourt un répertoire pour extraire flux.pre-exec-queries et flux.exec-queries des fichiers .conf.
+    Reconstruit les chemins absolus des fichiers référencés.
+
+    Args:
+        directory (str): Chemin du répertoire contenant les fichiers .conf.
+        scripts_dir (str): Chemin de base pour reconstituer les chemins des scripts.
+
+    Returns:
+        dict: Dictionnaire contenant les chemins des fichiers .conf en clé et leurs requêtes extraites en valeur.
+    """
+    conf_files_dict = {}
+
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.conf'):
+                file_path = Path(root) / file
+                pre_exec_queries, exec_queries = extract_exec_queries(file_path)
+
+                # Reconstituer les chemins absolus
+                pre_exec_full_paths = [
+                    Path(dir_hdfs) / query.lstrip('/').lstrip('\\') for query in pre_exec_queries
+                ]
+                exec_full_paths = [
+                    Path(dir_hdfs) / query.lstrip('/').lstrip('\\') for query in exec_queries
+                ]
+
+                conf_files_dict[str(file_path)] = {
+                    'pre_exec': [str(path) for path in pre_exec_full_paths],
+                    'exec': [str(path) for path in exec_full_paths]
+                }
+
+    return conf_files_dict
+
+
 
 
 def map_rdms_file_hql_file(dic_rdms_hive, list_paths_scripts_hql):
@@ -213,7 +230,7 @@ def map_rdms_file_hql_file(dic_rdms_hive, list_paths_scripts_hql):
     Retourne un dictionnaire avec en clé le nom de la table Hive et en valeur une liste des chemins des fichiers HQL associés.
     
     Args:
-    - dic_rdms_hive (dict): Dictionnaire avec en clé un identifiant et en valeur un dictionnaire contenant "table_data_hive" 
+    - dic_rdms_hive (dict): Dictionnaire avec en clé le nom de la table rdms et en valeur un dictionnaire contenant "table_data_hive" 
       (une liste avec le nom de la table Hive en position 0).
     - list_paths_scripts_hql (list): Liste des chemins de tous les fichiers HQL.
     

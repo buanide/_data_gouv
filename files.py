@@ -25,7 +25,7 @@ if __name__ == "__main__":
     
     #lecture des chemins des tous les scripts
     lists_paths_scripts=list_all_files(scripts_dir)
-
+    #lecture deES FICHIERS DE CONFIGURATIONS DE TYPE SQOOP
     dic_rdms_hive=extract_hive_table_and_queries(conf_dir)
     #for i,value in dic_rdms_hive.items():
      #   print(value)
