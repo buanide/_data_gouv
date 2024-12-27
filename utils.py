@@ -16,6 +16,30 @@ def list_all_files(directory):
             file_paths.append(os.path.join(root, file))
     return file_paths
 
+def list_all_files_bis(directory):
+    """
+    Retourne tous les chemins de fichiers dans un répertoire, y compris les sous-répertoires.
+    Gère les caractères spéciaux dans les chemins de fichiers.
+    """
+    file_paths = []
+    
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            try:
+                # Essayer d'encoder le chemin de fichier en UTF-8 pour gérer les caractères spéciaux
+                file_path = os.path.join(root, file)
+                file_path.encode('utf-8')  # Valide que le fichier peut être encodé en UTF-8
+                
+                file_paths.append(file_path)
+            except UnicodeEncodeError:
+                # Ignorer les fichiers avec des caractères invalides ou signaler une erreur
+                print(f"Fichier ignoré en raison de caractères invalides : {file}")
+            except Exception as e:
+                # Capturer toute autre exception pour diagnostiquer
+                print(f"Erreur lors de l'accès au fichier {file}: {e}")
+    
+    return file_paths
+
 def extract_pre_exec_and_exec_queries_by_file(file_paths, root_directory):
     """
     Associe chaque fichier à ses pré-queries en utilisant des chemins absolus.
@@ -188,42 +212,35 @@ def extract_exec_queries(file_path):
 
 
 def process_conf_files(directory, dir_hdfs):
-    """
-    Parcourt un répertoire pour extraire flux.pre-exec-queries et flux.exec-queries des fichiers .conf.
-    Reconstruit les chemins absolus des fichiers référencés.
-
-    Args:
-        directory (str): Chemin du répertoire contenant les fichiers .conf.
-        scripts_dir (str): Chemin de base pour reconstituer les chemins des scripts.
-
-    Returns:
-        dict: Dictionnaire contenant les chemins des fichiers .conf en clé et leurs requêtes extraites en valeur.
-    """
-    conf_files_dict = {}
-
-    for root, _, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.conf'):
-                file_path = Path(root) / file
-                pre_exec_queries, exec_queries = extract_exec_queries(file_path)
-
-                # Reconstituer les chemins absolus
-                pre_exec_full_paths = [
-                    Path(dir_hdfs) / query.lstrip('/').lstrip('\\') for query in pre_exec_queries
-                ]
-                exec_full_paths = [
-                    Path(dir_hdfs) / query.lstrip('/').lstrip('\\') for query in exec_queries
-                ]
-
-                conf_files_dict[str(file_path)] = {
-                    'pre_exec': [str(path) for path in pre_exec_full_paths],
-                    'exec': [str(path) for path in exec_full_paths]
-                }
-
-    return conf_files_dict
+    for root, dirs, files in os.walk(directory):
+        print("dir",dirs)
+        
+        
+            
 
 
+            #pre_exec_queries, exec_queries = extract_exec_queries(file)
 
+            #print("file",file)
+            #print("pre_exec_queries",pre_exec_queries)
+            #print("exec_queries",exec_queries)
+
+        """
+
+        # Reconstituer les chemins absolus
+        pre_exec_full_paths = [
+            Path(dir_hdfs) / query.lstrip('/').lstrip('\\') for query in pre_exec_queries
+        ]
+        exec_full_paths = [
+            Path(dir_hdfs) / query.lstrip('/').lstrip('\\') for query in exec_queries
+        ]
+
+        conf_files_dict[str(file_path)] = {
+            'pre_exec': [str(path) for path in pre_exec_full_paths],
+            'exec': [str(path) for path in exec_full_paths]
+        }
+        """
+    return []
 
 def map_rdms_file_hql_file(dic_rdms_hive, list_paths_scripts_hql):
     """
@@ -275,6 +292,7 @@ def map_rdms_file_hql_file(dic_rdms_hive, list_paths_scripts_hql):
     return dic
 
 
+# à améliorer avec une librairie qui parse les requêtes sql
 
 def extract_data_sources(hql_file_path):
     """
@@ -296,8 +314,6 @@ def extract_data_sources(hql_file_path):
     join_pattern = r'\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b'
     database_pattern = r'\bUSE\s+([a-zA-Z_][a-zA-Z0-9_]*)\b'
     insert_into_pattern = r'\bINSERT\s+INTO\s+(?:(TABLE\s+)?([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)(?:\s+PARTITION\s*\([a-zA-Z_][a-zA-Z0-9_]*\))?)\b'
-    
-
     
 # Recherche des correspondances
     
@@ -361,9 +377,6 @@ def extract_tables_from_hql(dic_name_table_hql_path):
         dic_load[table] = list(all_dependencies)  # Convertir l'ensemble en liste
 
     return dic_load
-
-
-
 
 
 def extract_table_names_from_load_conf_files(file_queries):
@@ -522,9 +535,6 @@ def generate_excel_with_rdms_and_dependencies_3(results, dependency_map, output_
     print(f"Fichier Excel généré avec succès : {output_file}")
 
 
-    
-
-
 
 def compare_and_update(reference_file, verification_file, output_file):
     """
@@ -665,3 +675,108 @@ def allo(dic_hive_depandances, dic_tables_hive_paths, dic_rdms_hive):
                         print(f"Aucun fichier HQL trouvé pour {i}. La liste reste vide.")
     
     return dic_hive_depandances
+
+
+def create_dic_tables(dic_queries_paths):
+    """
+     Crée un dictionnaire associant chaque fichier à une table principale et 
+    aux tables dépendantes extraites des requêtes, tout en identifiant les 
+    fichiers sans pré-exécution.
+
+    Args:
+        dic_queries_paths (dict): Dictionnaire contenant :
+                                  - Clés : Chemins des fichiers.
+                                  - Valeurs : Dictionnaires avec les clés 'pre_exec' (requêtes de pré-exécution)
+                                              et 'exec' (requêtes principales).
+
+    Returns:
+        tuple: 
+            - dict : Un dictionnaire où chaque clé est un chemin de fichier et chaque valeur contient :
+                - 'table_principale': Nom de la table principale, extraite de la première requête d'exécution.
+                - 'tables_dépendantes': Liste des tables dépendantes, extraites des requêtes de pré-exécution.
+            - list : Liste des fichiers qui ont un chemin erroné ou inexistant vers une prequery ('pre_exec').
+    """
+    dic = {}
+    table_sans_prexec=[]
+    for file_path, queries in dic_queries_paths.items():
+        tables = set()
+        file_name = os.path.basename(file_path)
+        # Initialiser table_principale par défaut
+        table_principale = None
+        if "load" in file_name:
+            #print("file",file_path)
+            if queries['exec']:
+                a, table_principale = extract_data_sources(queries['exec'][0])
+
+            if queries['exec']!=[]:
+                for query in queries['pre_exec']:
+                    a,b=extract_data_sources(query)
+                    tables.update(a)
+            else:
+                table_sans_prexec.append(file_path)
+                   
+            dic[file_path] = {
+                'table_principale': table_principale,
+                'tables_dépendantes': list(tables)
+            }
+    return dic,table_sans_prexec
+
+def redirect_error(list_to_redirect):
+    """
+    Rediriger les erreurs vers un fichier
+    """
+    with open("output.txt", "w", encoding="utf-8") as fichier:
+    # Ajouter une nouvelle ligne à chaque élément
+        fichier.writelines(element + "\n" for element in list_to_redirect)
+
+def create_dic_fil_queries(result):
+    """
+     Crée un dictionnaire contenant les chemins des fichiers en clé 
+    et les chemins des fichiers de requêtes en valeur.
+
+    Args:
+        result (dict): Dictionnaire où chaque clé est un chemin de fichier 
+                       et chaque valeur est un autre dictionnaire contenant 
+                       potentiellement deux clés :
+                       - 'pre_exec': Liste des requêtes de pré-exécution associées.
+                       - 'exec': Liste des requêtes principales associées.
+
+    Returns:
+        dict: Un dictionnaire où chaque clé est un chemin de fichier et 
+              chaque valeur est un dictionnaire contenant :
+              - 'pre_exec': Liste des requêtes de pré-exécution, ou une liste vide si non présentes.
+              - 'exec': Liste des requêtes principales, ou une liste vide si non présentes.
+    
+    """
+    dic = {}
+    for file_path, queries in result.items():
+        dic[file_path] = {
+            'pre_exec': queries.get('pre_exec', []),
+            'exec': queries.get('exec', [])
+        }
+    return dic
+
+def update_dependency_dict(existing_dict, dic_tables):
+    """
+    Met à jour un dictionnaire existant avec le contenu de dic_tables.
+    - Si une clé existe, étend la liste des dépendances.
+    - Si une clé n'existe pas (et n'est pas None), elle est ajoutée avec ses dépendances.
+    Args:
+        existing_dict (dict): Dictionnaire à mettre à jour.
+        dic_tables (dict): Dictionnaire contenant les nouvelles données.
+
+    Returns:
+        dict: Dictionnaire mis à jour.
+    """
+    for key, value in dic_tables.items():
+        # Vérifier que la clé n'est ni None ni vide
+        if key:
+            # Si la clé existe, étendre les dépendances
+            if key in existing_dict:
+                existing_dict[key]['tables_dépendantes'].extend(value['tables_dépendantes'])
+                # Éviter les doublons dans les dépendances
+                existing_dict[key]['tables_dépendantes'] = list(set(existing_dict[key]['tables_dépendantes']))
+            else:
+                # Ajouter la clé et ses dépendances au dictionnaire
+                existing_dict[key] = value
+    return existing_dict

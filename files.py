@@ -10,6 +10,10 @@ from utils import generate_excel_with_rdms_and_dependencies
 from utils import generate_excel_with_rdms_and_dependencies_3
 from utils import compare_and_update
 from utils import extract_data_sources
+from utils import process_conf_files
+from utils import create_dic_fil_queries
+from utils import create_dic_tables
+from utils import list_all_files_bis
 
 
 # Chemin vers le fichier HQL
@@ -31,10 +35,22 @@ if __name__ == "__main__":
      #   print(value)
     dic_tables_hive_paths=map_rdms_file_hql_file(dic_rdms_hive,lists_paths_scripts)
     dic_hive_depandances=extract_tables_from_hql(dic_tables_hive_paths)
+    #result = process_conf_files(conf_dir, root_dir)
+    conf=list_all_files_bis("C:/Users/YBQB7360/Downloads/HDFS/HDFS/PROD/CONF")
+    #dic_queries_paths=create_dic_fil_queries(result)
+    #dic_tables,table_sans_exec=create_dic_tables(dic_queries_paths)
+
+    for i in conf:
+        print(i)
 
 
-    generate_excel_with_rdms_and_dependencies_3(dic_rdms_hive, dic_hive_depandances, "output_file_with_cyclesv5.xlsx")
-    #generate_excel_with_rdms_and_dependencies(dic_rdms_hive,dic_hive_depandances,output_file)
+    
+    
+    
+  
+
+    #generate_excel_with_rdms_and_dependencies_3(dic_rdms_hive, dic_hive_depandances, "output_file_with_cyclesv5.xlsx")
+  
     #dependency_chain = build_dependency_chain(dic_rdms_hive, dic_hive_depandances)
     # Affichage du dictionnaire de dépendances avant l'aplatissement
 
