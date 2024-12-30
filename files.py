@@ -13,17 +13,17 @@ from utils import extract_data_sources
 from utils import process_conf_files
 from utils import create_dic_fil_queries
 from utils import create_dic_tables
-from utils import list_all_files_bis
+from utils import list_files_glob
 
 
 # Chemin vers le fichier HQL
 
 if __name__ == "__main__":
     root_dir = "C:/Users/YBQB7360/Downloads/HDFS/HDFS"
-    conf_dir = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
+    conf_dir = r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF'
     scripts_dir= r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS"
     scripts_dir=os.path.normpath(scripts_dir)
-    conf_dir=os.path.normpath(conf_dir) 
+    #conf_dir=os.path.normpath(conf_dir) 
     #lecture des chemins des fichiers de configuration
     chains=list_all_files(conf_dir)
     
@@ -36,18 +36,14 @@ if __name__ == "__main__":
     dic_tables_hive_paths=map_rdms_file_hql_file(dic_rdms_hive,lists_paths_scripts)
     dic_hive_depandances=extract_tables_from_hql(dic_tables_hive_paths)
     #result = process_conf_files(conf_dir, root_dir)
-    conf=list_all_files_bis("C:/Users/YBQB7360/Downloads/HDFS/HDFS/PROD/CONF")
+
     #dic_queries_paths=create_dic_fil_queries(result)
     #dic_tables,table_sans_exec=create_dic_tables(dic_queries_paths)
+    file_paths=list_all_files(conf_dir)
 
-    for i in conf:
+    for i in file_paths:
         print(i)
-
-
-    
-    
-    
-  
+        
 
     #generate_excel_with_rdms_and_dependencies_3(dic_rdms_hive, dic_hive_depandances, "output_file_with_cyclesv5.xlsx")
   

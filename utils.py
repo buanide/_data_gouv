@@ -4,6 +4,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from pathlib import Path
+import glob
 
 def list_all_files(directory):
     """
@@ -16,29 +17,38 @@ def list_all_files(directory):
             file_paths.append(os.path.join(root, file))
     return file_paths
 
-def list_all_files_bis(directory):
+
+
+def list_files_glob(directory='.', pattern='**/*', recursive=True):
     """
-    Retourne tous les chemins de fichiers dans un répertoire, y compris les sous-répertoires.
-    Gère les caractères spéciaux dans les chemins de fichiers.
+    Liste tous les fichiers correspondant à un motif spécifié dans un répertoire donné.
+
+    Args:
+        directory (str): Le répertoire de base pour la recherche.
+        pattern (str): Le motif de recherche de fichiers.
+        recursive (bool): Indique si la recherche doit être récursive.
+
+    Returns:
+        list: Liste des chemins de fichiers trouvés.
     """
-    file_paths = []
+    # Construire le motif complet
+    full_pattern = os.path.join(directory, pattern)
     
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            try:
-                # Essayer d'encoder le chemin de fichier en UTF-8 pour gérer les caractères spéciaux
-                file_path = os.path.join(root, file)
-                file_path.encode('utf-8')  # Valide que le fichier peut être encodé en UTF-8
-                
-                file_paths.append(file_path)
-            except UnicodeEncodeError:
-                # Ignorer les fichiers avec des caractères invalides ou signaler une erreur
-                print(f"Fichier ignoré en raison de caractères invalides : {file}")
-            except Exception as e:
-                # Capturer toute autre exception pour diagnostiquer
-                print(f"Erreur lors de l'accès au fichier {file}: {e}")
+    # Utiliser glob pour trouver les fichiers correspondant au motif
+    files = glob.glob(full_pattern, recursive=recursive)
     
-    return file_paths
+    # Afficher les fichiers trouvés
+    for file in files:
+        print(file)
+    
+    return files
+
+# Appel de la fonction avec le motif par défaut
+
+
+
+# Specify the directory path you want to start from
+
 
 def extract_pre_exec_and_exec_queries_by_file(file_paths, root_directory):
     """
@@ -128,6 +138,7 @@ def extract_tables_from_queries(queries):
 def extract_hive_table_and_queries(conf_dir):
     """"
   permet d'extraire pour chaque fichier conf la table rdms et hive
+  dans les fichiers sqoop
     """
     results = {}
     #total_rdms_tables = set()
@@ -211,36 +222,58 @@ def extract_exec_queries(file_path):
 
 
 
-def process_conf_files(directory, dir_hdfs):
+def process_conf_files(directory,hdfs_directory):
+    """
+    Traite les fichiers de configuration dans un répertoire donné et construit les chemins complets pour les requêtes pré-exécution et exécution.
+
+    Args:
+        directory (str): Le chemin du répertoire contenant les fichiers de configuration.
+        hdfs_directory (str): Le chemin de base du répertoire HDFS.
+
+    Returns:
+        dict: Un dictionnaire où les clés sont les chemins des fichiers de configuration et les valeurs sont des dictionnaires contenant
+              les listes de chemins complets pour les requêtes pré-exécution ('pre_exec') et exécution ('exec').
+      """
+    dic_conf_queries={}
     for root, dirs, files in os.walk(directory):
-        print("dir",dirs)
-        
-        
-            
+        for file in files:
+            path = os.path.join(root, file)
+            pre_exec_queries, exec_queries = extract_exec_queries(path)
+            paths_pre_exec_queries = []
+            path_exec_queries=[]
+            if pre_exec_queries:
+                for query in pre_exec_queries:
+                    # Construire le chemin absolu
+                    if query.startswith('/'):
+                        query_windows_path = query.replace('/', '\\')
+                        # Construire le chemin complet
+                        full_path = hdfs_directory+query_windows_path
+                        #print("Première partie du chemin :", hdfs_directory)
+                        #print("Pre-exec query :", query)
+                        #print("Chemin complet :", full_path)
+                        paths_pre_exec_queries.append(full_path)
+                    else:
+                        print("ce n'est pas un chemin, fonction,process_conf_files", query)
 
+            if exec_queries:
+                for query in exec_queries:
+                    # Construire le chemin absolu
+                    if query.startswith('/'):
+                        query_windows_path = query.replace('/', '\\')
+                        # Construire le chemin complet
+                        full_path = hdfs_directory+query_windows_path
+                        #print("Première partie du chemin :", hdfs_directory)
+                        #print("Pre-exec query :", query)
+                        #print("Chemin complet :", full_path)
+                        path_exec_queries.append(full_path)
+                    else:
+                        print("ce n'est pas un chemin, fonction,process_conf_files", query)
 
-            #pre_exec_queries, exec_queries = extract_exec_queries(file)
+            dic_conf_queries[path] = {'pre_exec': paths_pre_exec_queries, 'exec': path_exec_queries}
 
-            #print("file",file)
-            #print("pre_exec_queries",pre_exec_queries)
-            #print("exec_queries",exec_queries)
+    return dic_conf_queries
+                 
 
-        """
-
-        # Reconstituer les chemins absolus
-        pre_exec_full_paths = [
-            Path(dir_hdfs) / query.lstrip('/').lstrip('\\') for query in pre_exec_queries
-        ]
-        exec_full_paths = [
-            Path(dir_hdfs) / query.lstrip('/').lstrip('\\') for query in exec_queries
-        ]
-
-        conf_files_dict[str(file_path)] = {
-            'pre_exec': [str(path) for path in pre_exec_full_paths],
-            'exec': [str(path) for path in exec_full_paths]
-        }
-        """
-    return []
 
 def map_rdms_file_hql_file(dic_rdms_hive, list_paths_scripts_hql):
     """
@@ -398,73 +431,6 @@ def extract_table_names_from_load_conf_files(file_queries):
     return dic_load
 
 
-
-def generate_excel_with_rdms_and_dependencies(results, dependency_map, output_file):
-    """
-    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, en évitant les cycles.
-
-    Args:
-        results (dict): Dictionnaire contenant les associations RDMS et Hive.
-        dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.     
-        output_file (str): Chemin du fichier Excel de sortie.
-    """
-    # Liste pour stocker les lignes de données
-    rows = []
-
-    def process_table(table, dependency_path, visited):
-        """
-        Récursivement, ajoute les dépendances Hive dans la liste des lignes tout en évitant les cycles.
-
-        Args:
-            table (str): Table principale ou dépendance à traiter.
-            dependency_path (list): Chemin des dépendances accumulées.
-            visited (set): Ensemble des tables déjà visitées dans cette branche de récursion.
-        """
-        if table in visited:
-            # Cycle détecté, ajouter une indication de cycle et arrêter cette branche
-            current_row = dependency_path + [f"{table} (cycle détecté)"]
-            rows.append(current_row)
-            return
-
-        # Marquer cette table comme visitée
-        visited.add(table)
-
-        # Crée une nouvelle ligne avec la dépendance actuelle
-        current_row = dependency_path + [table]
-        rows.append(current_row)
-
-        # Continuer avec les dépendances si elles existent
-        if table in dependency_map:
-            for dep in dependency_map[table]:
-                process_table(dep, current_row, visited.copy())  # Passer une copie pour chaque branche
-
-    # Traitement des associations RDMS -> Hive et dépendances Hive
-    for file_path, table_info in results.items():
-        tables_rdms = table_info.get("table_data_rdms", [])
-        tables_hive = table_info.get("table_data_hive", [])
-        for rdms_table in tables_rdms:
-            for hive_table in tables_hive:
-                # Ajouter la relation RDMS -> Hive en tant que ligne de base
-                rows.append([rdms_table, hive_table])
-
-                # Ajouter les dépendances Hive pour cette table Hive
-                if hive_table in dependency_map:
-                    process_table(hive_table, [rdms_table], set())  # Initialiser "visited" comme un ensemble vide
-
-    # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
-    max_columns = max(len(row) for row in rows)
-    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns - 2)]
-
-    # Créer un DataFrame avec les données collectées
-    df = pd.DataFrame(rows, columns=columns)
-
-    # Exporter le DataFrame vers un fichier Excel
-    df.to_excel(output_file, index=False)
-    print(f"Fichier Excel généré avec succès : {output_file}")
-
-
-
-
 def generate_excel_with_rdms_and_dependencies_3(results, dependency_map, output_file):
     """
     Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
@@ -535,191 +501,154 @@ def generate_excel_with_rdms_and_dependencies_3(results, dependency_map, output_
     print(f"Fichier Excel généré avec succès : {output_file}")
 
 
-
-def compare_and_update(reference_file, verification_file, output_file):
+def generate_excel_with_table_dependencies(dependency_map, output_file):
     """
-    Corrige un fichier Excel en se basant sur un fichier de référence :
-    - Seules les tables RDMS présentes dans le fichier à vérifier sont prises en compte.
-    - Les lignes du fichier à vérifier sont corrigées en fonction du fichier de référence.
-    - Les lignes corrigées ou ajoutées sont annotées dans les commentaires.
+    Génère un fichier Excel avec les dépendances des tables jusqu'à ce qu'il n'y ait plus de dépendances directes.
 
     Args:
-        reference_file (str): Chemin du fichier de référence généré automatiquement.
-        verification_file (str): Chemin du fichier à vérifier.
+        dependency_map (dict): Dictionnaire des dépendances {table_principale: [dépendances]}.
         output_file (str): Chemin du fichier Excel de sortie.
     """
-    # Charger les fichiers Excel
-    df_ref = pd.read_excel(reference_file)
-    df_verif = pd.read_excel(verification_file)
+    # Liste pour stocker les chemins uniques de dépendances
+    unique_paths = set()
 
-    # Convertir les colonnes en chaînes pour éviter des erreurs de type
-    df_ref = df_ref.astype(str).fillna("")
-    df_verif = df_verif.astype(str).fillna("")
+    def get_all_dependencies(table, current_path, visited):
+        """
+        Explore toutes les dépendances d'une table en profondeur et ajoute chaque chemin unique.
 
-    # Initialiser le DataFrame pour la sortie
-    corrected_rows = []
+        Args:
+            table (str): La table pour laquelle les dépendances doivent être explorées.
+            current_path (list): Le chemin courant (accumulé).
+            visited (set): Ensemble des tables déjà visitées pour éviter les cycles.
+        """
+        if table in visited:
+            # Cycle détecté, ajouter le chemin avec une indication
+            unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
+            return
 
-    # Filtrer les tables RDMS présentes dans le fichier à vérifier
-    rdms_tables = df_verif["Table_RDMS"].unique()
+        # Ajouter la table courante au chemin
+        current_path = current_path + [table]
 
-    # Vérifier et corriger ligne par ligne
-    for table in rdms_tables:
-        # Extraire les lignes pour cette table dans les deux fichiers
-        ref_table = df_ref[df_ref["Table_RDMS"] == table]
-        verif_table = df_verif[df_verif["Table_RDMS"] == table]
+        # Si la table n'a pas de dépendances, ajouter le chemin complet
+        if table not in dependency_map or not dependency_map[table]:
+            unique_paths.add(tuple(current_path))
+            return
 
-        for _, verif_row in verif_table.iterrows():
-            if not ((ref_table == verif_row).all(axis=1)).any():
-                # Ligne présente dans le fichier à vérifier mais incorrecte ou incomplète
-                matched_ref = ref_table[(ref_table["Table_RDMS"] == verif_row["Table_RDMS"]) & 
-                                        (ref_table["Table_Hive"] == verif_row["Table_Hive"])]
-                if not matched_ref.empty:
-                    # Compléter la ligne à partir de la référence
-                    corrected_row = matched_ref.iloc[0].tolist()
-                    if corrected_row not in corrected_rows:  # Ajouter seulement si unique
-                        corrected_rows.append(corrected_row + ["Corrigée (manquante ou incorrecte)"])
-                else:
-                    # Ligne totalement absente de la référence
-                    corrected_row = verif_row.tolist()
-                    if corrected_row not in corrected_rows:  # Ajouter seulement si unique
-                        corrected_rows.append(corrected_row + ["Non trouvée dans la référence"])
-            else:
-                # Ligne correcte
-                corrected_row = verif_row.tolist()
-                if corrected_row not in corrected_rows:  # Ajouter seulement si unique
-                    corrected_rows.append(corrected_row + ["OK"])
+        # Marquer la table comme visitée
+        visited.add(table)
 
-    # Ajouter les colonnes de commentaires au fichier final
-    columns = list(df_verif.columns) + ["Commentaires"]
-    final_df = pd.DataFrame(corrected_rows, columns=columns)
+        # Parcourir les dépendances et continuer l'exploration
+        for dependency in dependency_map[table]:
+            get_all_dependencies(dependency, current_path, visited.copy())
 
-    # Sauvegarder dans le fichier Excel
-    final_df.to_excel(output_file, index=False, engine="openpyxl")
-    wb = load_workbook(output_file)
-    ws = wb.active
+    # Parcourir chaque table principale dans le dictionnaire
+    for main_table in dependency_map:
+        get_all_dependencies(main_table, [], set())
 
-    # Appliquer des styles pour la mise en évidence
-    green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Vert clair
-    red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # Rouge clair
+    # Convertir les chemins uniques en lignes pour le DataFrame
+    rows = [list(path) for path in unique_paths]
 
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-        comment_cell = row[-1]  # Dernière colonne (Commentaires)
-        if comment_cell.value == "Corrigée (manquante ou incorrecte)":
-            for cell in row:
-                cell.fill = green_fill
-        elif comment_cell.value == "Non trouvée dans la référence":
-            for cell in row:
-                cell.fill = red_fill
+    # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_Principale"] + [f"Dépendance{i+1}" for i in range(max_columns - 1)]
 
-    # Enregistrer le fichier avec la mise en forme
-    wb.save(output_file)
-    print(f"Fichier corrigé généré avec succès : {output_file}")
+    # Créer un DataFrame avec les données collectées
+    df = pd.DataFrame(rows, columns=columns)
+
+    # Supprimer les doublons et exporter les données vers un fichier Excel
+    df_unique = df.drop_duplicates()
+    df_unique.to_excel(output_file, index=False)
+    print(f"Fichier Excel généré avec succès : {output_file}")
 
 
-def allo(dic_hive_depandances, dic_tables_hive_paths, dic_rdms_hive): 
-    """
-    Met à jour le dictionnaire des dépendances Hive. Ajoute de nouvelles tables en tant que clés, 
-    extrait les dépendances depuis leurs fichiers HQL si disponibles, ou laisse la liste vide.
 
-    Args:
-        dic_hive_depandances (dict): Dictionnaire des dépendances Hive.
-        dic_tables_hive_paths (dict): Dictionnaire associant les tables Hive à leurs chemins de fichiers HQL.
-        dic_rdms_hive (dict): Dictionnaire associant des chemins de fichiers à des correspondances RDMS -> Hive.
-       
-    Returns:
-        dict: Dictionnaire mis à jour des dépendances Hive.
-    """
-    # Créer une copie des clés du dictionnaire pour éviter des erreurs de modification pendant l'itération
-    keys_copy = list(dic_hive_depandances.keys())
-    
-    for table_hive in keys_copy:
-        dependencies = dic_hive_depandances[table_hive]
-
-        for i in dependencies:
-            if "spark" not in i.lower():
-                print(f"\nTable actuelle : {i}")
-                correspondance_trouvee = False  # Flag pour vérifier si une correspondance est trouvée
-                
-                # Rechercher la correspondance RDMS -> Hive
-                for path, value in dic_rdms_hive.items():
-                    rdms_tables = value.get("table_data_rdms", [])
-                    hive_tables = value.get("table_data_hive", [])
-                    
-                    if i in rdms_tables:
-                        correspondance_trouvee = True
-                        print(f"Équivalent trouvé : {i} -> {hive_tables}")
-                        
-                        for hive_table in hive_tables:
-                            if hive_table not in dic_hive_depandances:
-                                dic_hive_depandances[hive_table] = []
-                                print(f"Nouvelle clé ajoutée : {hive_table} avec une liste vide.")
-                
-                if not correspondance_trouvee:
-                    # Ajouter la table hive elle-même comme clé si elle n'existe pas
-                    if i not in dic_hive_depandances:
-                        dic_hive_depandances[i] = []
-                        print(f"Table sans correspondance ajoutée : {i} avec une liste vide.")
-                    
-                    # Rechercher le fichier HQL associé à cette table
-                    if i in dic_tables_hive_paths:
-                        hql_file_path = dic_tables_hive_paths[i]
-                        print(f"Chemin HQL trouvé pour {i} : {hql_file_path}")
-                        
-                        # Utiliser la fonction extract_data_sources pour extraire les dépendances
-                        _, dependent_tables = extract_data_sources(hql_file_path)
-                        
-                        # Ajouter les tables dépendantes à la liste
-                        dic_hive_depandances[i].extend(dependent_tables)
-                        print(f"Dépendances ajoutées pour {i} : {dependent_tables}")
-                    else:
-                        print(f"Aucun fichier HQL trouvé pour {i}. La liste reste vide.")
-    
-    return dic_hive_depandances
-
-
-def create_dic_tables(dic_queries_paths):
-    """
-     Crée un dictionnaire associant chaque fichier à une table principale et 
-    aux tables dépendantes extraites des requêtes, tout en identifiant les 
-    fichiers sans pré-exécution.
-
-    Args:
-        dic_queries_paths (dict): Dictionnaire contenant :
-                                  - Clés : Chemins des fichiers.
-                                  - Valeurs : Dictionnaires avec les clés 'pre_exec' (requêtes de pré-exécution)
-                                              et 'exec' (requêtes principales).
-
-    Returns:
-        tuple: 
-            - dict : Un dictionnaire où chaque clé est un chemin de fichier et chaque valeur contient :
-                - 'table_principale': Nom de la table principale, extraite de la première requête d'exécution.
-                - 'tables_dépendantes': Liste des tables dépendantes, extraites des requêtes de pré-exécution.
-            - list : Liste des fichiers qui ont un chemin erroné ou inexistant vers une prequery ('pre_exec').
-    """
+def get_dir_dependances(dic_files_queries_paths):
     dic = {}
-    table_sans_prexec=[]
-    for file_path, queries in dic_queries_paths.items():
-        tables = set()
-        file_name = os.path.basename(file_path)
-        # Initialiser table_principale par défaut
-        table_principale = None
-        if "load" in file_name:
-            #print("file",file_path)
-            if queries['exec']:
-                a, table_principale = extract_data_sources(queries['exec'][0])
+    for i, queries in dic_files_queries_paths.items():
+        if queries['exec']:
+            for q in queries['exec']:
+                dependent_tables, main_table = extract_data_sources(q)
+                if main_table and main_table not in dic:
+                    dic[main_table] = set()
+                if main_table:
+                    dic[main_table].update(dependent_tables)
 
-            if queries['exec']!=[]:
-                for query in queries['pre_exec']:
-                    a,b=extract_data_sources(query)
-                    tables.update(a)
-            else:
-                table_sans_prexec.append(file_path)
-                   
-            dic[file_path] = {
-                'table_principale': table_principale,
-                'tables_dépendantes': list(tables)
-            }
-    return dic,table_sans_prexec
+        if queries['pre_exec']:
+            for q in queries['pre_exec']:
+                dependent_tables, main_table = extract_data_sources(q)
+                if main_table and main_table not in dic:
+                    dic[main_table] = set()
+                if main_table:
+                    dic[main_table].update(dependent_tables)
+
+    for table in dic:
+        dic[table] = list(dic[table])
+
+    return dic
+
+
+def display_table_dependencies(dependency_map, table_name):
+    """
+    Affiche les dépendances d'une table spécifique DU DATALAKE et les écrit dans un fichier Excel si elles existent.
+
+    Args:
+        dependency_map (dict): Dictionnaire des dépendances {table_principale: [dépendances]}.
+        table_name (str): Nom de la table pour laquelle afficher les dépendances.
+    """
+    # Liste pour stocker les chemins uniques de dépendances
+    unique_paths = set()
+
+    def get_all_dependencies(table, current_path, visited):
+        """
+        Explore toutes les dépendances d'une table en profondeur et ajoute chaque chemin unique.
+
+        Args:
+            table (str): La table pour laquelle les dépendances doivent être explorées.
+            current_path (list): Le chemin courant (accumulé).
+            visited (set): Ensemble des tables déjà visitées pour éviter les cycles.
+        """
+        if table in visited:
+            # Cycle détecté, ajouter le chemin avec une indication
+            unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
+            return
+
+        # Ajouter la table courante au chemin
+        current_path = current_path + [table]
+
+        # Si la table n'a pas de dépendances, ajouter le chemin complet
+        if table not in dependency_map or not dependency_map[table]:
+            unique_paths.add(tuple(current_path))
+            return
+
+        # Marquer la table comme visitée
+        visited.add(table)
+
+        # Parcourir les dépendances et continuer l'exploration
+        for dependency in dependency_map[table]:
+            get_all_dependencies(dependency, current_path, visited.copy())
+
+    # Vérifier si la table existe dans le dictionnaire
+    if table_name in dependency_map:
+        get_all_dependencies(table_name, [], set())
+    else:
+        print(f"La table '{table_name}' n'existe pas dans le dictionnaire.")
+        return
+
+    # Convertir les chemins uniques en lignes pour le DataFrame
+    rows = [list(path) for path in unique_paths]
+
+    # Déterminer le nombre maximum de colonnes pour formater correctement
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_Principale"] + [f"Dépendance{i+1}" for i in range(max_columns - 1)]
+
+    # Créer un DataFrame avec les données collectées
+    df = pd.DataFrame(rows, columns=columns)
+
+    # Exporter les données vers un fichier Excel
+    output_file = f"{table_name}_dependencies.xlsx"
+    df.to_excel(output_file, index=False)
+    print(f"Les dépendances de la table '{table_name}' ont été exportées vers : {output_file}")
+
 
 def redirect_error(list_to_redirect):
     """
@@ -780,3 +709,17 @@ def update_dependency_dict(existing_dict, dic_tables):
                 # Ajouter la clé et ses dépendances au dictionnaire
                 existing_dict[key] = value
     return existing_dict
+
+
+
+def write_file_paths_to_txt(file_paths, output_file):
+    """
+    Écrit les chemins de fichiers dans un fichier texte.
+    """
+    try:
+        with open(output_file, 'w') as f:
+            for file_path in file_paths:
+                f.write(file_path + '\n')
+        print(f"Les chemins de fichiers ont été écrits dans {output_file}")
+    except Exception as e:
+        print(f"Erreur lors de l'écriture dans le fichier {output_file}: {e}")
