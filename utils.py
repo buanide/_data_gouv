@@ -4,9 +4,10 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from pathlib import Path
-import glob
+import sqlparse
 
-def list_all_files(directory):
+
+def list_all_files(directory: str) -> list:
     """
     Retourne tous les chemins de fichiers dans un répertoire, y compris les sous-répertoires.
     """
@@ -18,39 +19,10 @@ def list_all_files(directory):
     return file_paths
 
 
-
-def list_files_glob(directory='.', pattern='**/*', recursive=True):
-    """
-    Liste tous les fichiers correspondant à un motif spécifié dans un répertoire donné.
-
-    Args:
-        directory (str): Le répertoire de base pour la recherche.
-        pattern (str): Le motif de recherche de fichiers.
-        recursive (bool): Indique si la recherche doit être récursive.
-
-    Returns:
-        list: Liste des chemins de fichiers trouvés.
-    """
-    # Construire le motif complet
-    full_pattern = os.path.join(directory, pattern)
-    
-    # Utiliser glob pour trouver les fichiers correspondant au motif
-    files = glob.glob(full_pattern, recursive=recursive)
-    
-    # Afficher les fichiers trouvés
-    for file in files:
-        print(file)
-    
-    return files
-
-# Appel de la fonction avec le motif par défaut
-
-
-
 # Specify the directory path you want to start from
 
 
-def extract_pre_exec_and_exec_queries_by_file(file_paths, root_directory):
+def extract_pre_exec_and_exec_queries_by_file(file_paths:list, root_directory:str) -> dict:
     """
     Associe chaque fichier à ses pré-queries en utilisant des chemins absolus.
 
@@ -90,7 +62,7 @@ def extract_pre_exec_and_exec_queries_by_file(file_paths, root_directory):
 
     return file_queries
 
-def extract_table_name_from_file(file_path):
+def extract_table_name_from_file(file_path: str) -> str:
     """
     Extrait le nom de la table d'une clause INSERT INTO à partir d'un fichier .hql.
 
@@ -111,7 +83,7 @@ def extract_table_name_from_file(file_path):
         print(f"Erreur lors de la lecture du fichier {file_path}: {e}")
     return None
 
-def extract_tables_from_queries(queries):
+def extract_tables_from_queries(queries: str) -> list:
     """
     Extrait les noms des tables de la forme DOMAINE.NOM_TABLE des requêtes SQL.
 
@@ -135,10 +107,16 @@ def extract_tables_from_queries(queries):
 
 
 
-def extract_hive_table_and_queries(conf_dir):
-    """"
-  permet d'extraire pour chaque fichier conf la table rdms et hive
-  dans les fichiers sqoop
+def extract_hive_table_and_queries(conf_dir: str) -> dict:
+    """
+    Permet d'extraire pour chaque fichier de configuration la table RDMS et Hive
+    dans les fichiers conf utilisant sqoop.
+
+    Args:
+        conf_dir (str): Chemin du répertoire contenant les fichiers de configuration.
+
+    Returns:
+        dict: Dictionnaire contenant les résultats pour chaque fichier de configuration.
     """
     results = {}
     #total_rdms_tables = set()
@@ -147,7 +125,7 @@ def extract_hive_table_and_queries(conf_dir):
     try:
         for root, dirs, files in os.walk(conf_dir):
             for file in files:
-                if file.lower().startswith('sqoop-export-spark') and file.lower().endswith('.conf'):
+                if file.lower().startswith('sqoop') and file.lower().endswith('.conf') and 'cron' not in file.lower():
                     file_path = os.path.join(root, file)
                     try:
                         with open(file_path, 'r', encoding='utf-8') as f:
@@ -190,7 +168,7 @@ def extract_hive_table_and_queries(conf_dir):
     return results
 
 
-def extract_exec_queries(file_path):
+def extract_exec_queries(file_path: str) -> tuple:
     """
     Extrait les valeurs des variables flux.exec-queries et flux.pre-exec-queries dans un fichier de configuration.
     Args:
@@ -222,7 +200,7 @@ def extract_exec_queries(file_path):
 
 
 
-def process_conf_files(directory,hdfs_directory):
+def process_conf_files(directory:str,hdfs_directory:str) -> dict:
     """
     Traite les fichiers de configuration dans un répertoire donné et construit les chemins complets pour les requêtes pré-exécution et exécution.
 
@@ -275,7 +253,7 @@ def process_conf_files(directory,hdfs_directory):
                  
 
 
-def map_rdms_file_hql_file(dic_rdms_hive, list_paths_scripts_hql):
+def map_rdms_file_hql_file(dic_rdms_hive:dict, list_paths_scripts_hql:list) -> dict:
     """
     Retourne un dictionnaire avec en clé le nom de la table Hive et en valeur une liste des chemins des fichiers HQL associés.
     
@@ -327,7 +305,7 @@ def map_rdms_file_hql_file(dic_rdms_hive, list_paths_scripts_hql):
 
 # à améliorer avec une librairie qui parse les requêtes sql
 
-def extract_data_sources(hql_file_path):
+def extract_data_sources(hql_file_path:str) -> tuple:
     """
     Permet de lire un fichier HQL et d'en extraire ses tables.
 
@@ -380,7 +358,7 @@ def extract_data_sources(hql_file_path):
     return tables, main_table
 
 
-def extract_tables_from_hql(dic_name_table_hql_path):
+def extract_tables_from_hql(dic_name_table_hql_path:dict) -> dict:
     """
     dic_name_table_hql_path (dict): Dictionnaire avec en clé le nom de la table Hive (str) 
     et en valeur une liste des chemins des fichiers HQL (list) associés.
@@ -412,26 +390,8 @@ def extract_tables_from_hql(dic_name_table_hql_path):
     return dic_load
 
 
-def extract_table_names_from_load_conf_files(file_queries):
-    """
-    extrait le nom des tables dans les requêtes de la form INSERT INTO
-    pour les fichiers .conf possédants dans leur nom
-    """ 
-    tables=[]
-    fichiers_conf=[]
-    dic_load={}
-    for key, value in file_queries.items():
-        if "load" in key:
-            for i in value:
-             if "insert" in i:
-                 #print("chmin",i)
-                 dependances,table=extract_data_sources(i)
-                 dic_load[table]=dependances
 
-    return dic_load
-
-
-def generate_excel_with_rdms_and_dependencies_3(results, dependency_map, output_file):
+def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict, output_file:str) -> None:
     """
     Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
     Args:
@@ -501,68 +461,12 @@ def generate_excel_with_rdms_and_dependencies_3(results, dependency_map, output_
     print(f"Fichier Excel généré avec succès : {output_file}")
 
 
-def generate_excel_with_table_dependencies(dependency_map, output_file):
+
+
+def get_dir_dependances(dic_files_queries_paths:dict) -> dict:
     """
-    Génère un fichier Excel avec les dépendances des tables jusqu'à ce qu'il n'y ait plus de dépendances directes.
-
-    Args:
-        dependency_map (dict): Dictionnaire des dépendances {table_principale: [dépendances]}.
-        output_file (str): Chemin du fichier Excel de sortie.
+    retourne un dictionnaire contenant les dépendances des tables du datalake.
     """
-    # Liste pour stocker les chemins uniques de dépendances
-    unique_paths = set()
-
-    def get_all_dependencies(table, current_path, visited):
-        """
-        Explore toutes les dépendances d'une table en profondeur et ajoute chaque chemin unique.
-
-        Args:
-            table (str): La table pour laquelle les dépendances doivent être explorées.
-            current_path (list): Le chemin courant (accumulé).
-            visited (set): Ensemble des tables déjà visitées pour éviter les cycles.
-        """
-        if table in visited:
-            # Cycle détecté, ajouter le chemin avec une indication
-            unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
-            return
-
-        # Ajouter la table courante au chemin
-        current_path = current_path + [table]
-
-        # Si la table n'a pas de dépendances, ajouter le chemin complet
-        if table not in dependency_map or not dependency_map[table]:
-            unique_paths.add(tuple(current_path))
-            return
-
-        # Marquer la table comme visitée
-        visited.add(table)
-
-        # Parcourir les dépendances et continuer l'exploration
-        for dependency in dependency_map[table]:
-            get_all_dependencies(dependency, current_path, visited.copy())
-
-    # Parcourir chaque table principale dans le dictionnaire
-    for main_table in dependency_map:
-        get_all_dependencies(main_table, [], set())
-
-    # Convertir les chemins uniques en lignes pour le DataFrame
-    rows = [list(path) for path in unique_paths]
-
-    # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
-    max_columns = max(len(row) for row in rows)
-    columns = ["Table_Principale"] + [f"Dépendance{i+1}" for i in range(max_columns - 1)]
-
-    # Créer un DataFrame avec les données collectées
-    df = pd.DataFrame(rows, columns=columns)
-
-    # Supprimer les doublons et exporter les données vers un fichier Excel
-    df_unique = df.drop_duplicates()
-    df_unique.to_excel(output_file, index=False)
-    print(f"Fichier Excel généré avec succès : {output_file}")
-
-
-
-def get_dir_dependances(dic_files_queries_paths):
     dic = {}
     for i, queries in dic_files_queries_paths.items():
         if queries['exec']:
@@ -587,7 +491,7 @@ def get_dir_dependances(dic_files_queries_paths):
     return dic
 
 
-def display_table_dependencies(dependency_map, table_name):
+def display_table_dependencies(dependency_map:dict, table_name:str) -> None:
     """
     Affiche les dépendances d'une table spécifique DU DATALAKE et les écrit dans un fichier Excel si elles existent.
 
@@ -723,3 +627,42 @@ def write_file_paths_to_txt(file_paths, output_file):
         print(f"Les chemins de fichiers ont été écrits dans {output_file}")
     except Exception as e:
         print(f"Erreur lors de l'écriture dans le fichier {output_file}: {e}")
+
+
+def parse_hql_file(file_path):
+    """
+    Parse un fichier HQL pour extraire les tables, champs, et champs calculés.
+    
+    Args:
+        file_path (str): Chemin du fichier HQL.
+        
+    Returns:
+        list: Une liste contenant des dictionnaires avec les tables et champs.
+    """
+    results = []
+
+    with open(file_path, 'r') as file:
+        query = file.read()
+    
+    # Formater et analyser la requête SQL
+    parsed = sqlparse.format(query, reindent=True, keyword_case='upper')
+    statements = sqlparse.split(parsed)
+
+    for statement in statements:
+        tables = re.findall(r'\bFROM\s+([a-zA-Z0-9_.]+)', statement, re.IGNORECASE)
+        columns = re.findall(r'\bSELECT\s+(.*?)\bFROM', statement, re.IGNORECASE)
+
+        if tables:
+            for table in tables:
+                # Extraire les colonnes et champs calculés
+                fields = re.findall(r'\b([\w\.]+)\s+AS\s+([\w]+)', statement, re.IGNORECASE)
+                calculated_fields = [(calc[1], calc[0]) for calc in fields]
+
+                # Ajouter les résultats
+                results.append({
+                    "Table": table.strip(),
+                    "Columns": columns,
+                    "Calculated_Fields": calculated_fields
+                })
+
+    return results
