@@ -27,14 +27,10 @@ if __name__ == "__main__":
     scripts_dir=os.path.normpath(scripts_dir)
     directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
     hql_path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\FT\IN_ZTE\prequery_spark_completude.hql"
-
-
+    
 
     #result = DDLParser(ddl).run(output_mode="hql")
     #print(result)
-
-
-    
     dic_files_queries_paths = process_conf_files(directory_conf,root_dir)
     # dic table hive -> dependances
     dic_tables_dependances=get_dir_dependances(dic_files_queries_paths)
@@ -42,14 +38,5 @@ if __name__ == "__main__":
     dic_rdms_hive=extract_hive_table_and_queries(directory_conf)
     #generation des dependances de la table TANGO_CDR.IT_OMNY_USER_REGISTRATION_V2
     #display_table_dependencies(dic,"TANGO_CDR.IT_OMNY_USER_REGISTRATION_V2")
-
     generate_excel_with_rdms_and_dependencies(dic_rdms_hive,dic_tables_dependances, "stephane.xlsx")
     
-
-
-
-    
-
-
-            
-

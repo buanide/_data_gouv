@@ -106,7 +106,6 @@ def extract_tables_from_queries(queries: str) -> list:
 
 
 
-
 def extract_hive_table_and_queries(conf_dir: str) -> dict:
     """
     Permet d'extraire pour chaque fichier de configuration la table RDMS et Hive
