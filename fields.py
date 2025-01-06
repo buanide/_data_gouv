@@ -95,63 +95,43 @@ def process_hql_files(file_paths):
     return results
 
 
-def parse_hql(file_path):
-    # Format and split the query
+def find_alias_after_parentheses(hive_query):
+    """
+    Trouve les alias qui suivent un FROM ou JOIN avec une sous-requête en parenthèses.
 
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            hql_query = file.read()
+    Args:
+        hive_query (str): La requête Hive à analyser.
 
-    except ValueError as e:
-                print(f"Erreur lors du traitement du fichier {file_path}: {e}")
-        
-    parsed = sqlparse.format(hql_query, reindent=True, keyword_case='upper')
-    statements = sqlparse.parse(parsed)
-    lineage = defaultdict(list)
+    Returns:
+        dict: Un dictionnaire où les clés sont les alias et les valeurs sont les sous-requêtes associées.
+    """
+    # Supprimer les sauts de ligne pour simplifier l'analyse
+    hive_query = " ".join(hive_query.split())
 
-    for statement in statements:
-        if statement.get_type() == 'INSERT':
-            tokens = [str(token).strip() for token in statement.tokens if not token.is_whitespace]
-            target_table = None
-            select_clause = None
-            
-            # Extract the target table
-            for i, token in enumerate(tokens):
-                if token.upper().startswith("INSERT INTO"):
-                    target_table = tokens[i + 1]
-            
-            # Extract the SELECT clause
-            for token in tokens:
-                if token.upper().startswith("SELECT"):
-                    select_clause = token
-                    break
-            
-            if target_table and select_clause:
-                select_lines = select_clause.split("\n")
-                for line in select_lines:
-                    if " AS " in line:
-                        output_col, input_cols = line.split(" AS ")
-                        output_col = output_col.strip()
-                        input_cols = input_cols.split(",")
-                        lineage[output_col].extend([col.strip() for col in input_cols])
-    return lineage
+    # Expression régulière corrigée
+    pattern = r'(?:FROM|JOIN)\s*\((.*?)\)\s+(\w+)'
 
-#dic_fields=process_hql_files(list_scripts)
-path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF\SCORES_CBM\DORMANCE_GLOBALE\PREDICTION\compute_spark_dormance_globale_prediction_monthly.hql"
-lineage = parse_hql(path)
+    # Trouver toutes les correspondances
+    matches = re.findall(pattern, hive_query)
 
-for output_col, input_cols in lineage.items():
-    print(f"Output Column: {output_col}")
-    print(f"Source Columns: {', '.join(input_cols)}")
+    # Afficher les correspondances
+    print(matches)
+
+    # Construire le dictionnaire alias -> sous-requête
+    alias_dict = {match[1]: match[0] for match in matches}
+    return alias_dict
 
 
+# Exemple d'utilisation
+hive_query = """
+LEFT JOIN ( 
+    SELECT ACCESS_KEY, PROFILE, MAX(OPERATOR_CODE) OPERATOR_CODE 
+    FROM MON.SPARK_FT_CONTRACT_SNAPSHOT 
+    WHERE EVENT_DATE = '###SLICE_VALUE###'
+    GROUP BY ACCESS_KEY, PROFILE
+) C
 """
-count=0
-for i, dic in dic_fields.items():
-    print(f"Nom de la table : {dic['table_name']}")
-    print(f"Champs : {dic['fields']}")
-    print()
-    count+=1
-    if count==5:
-        break
-"""
+
+# Appel de la fonction
+alias_dict = find_alias_after_parentheses(hive_query)
+print(alias_dict)
