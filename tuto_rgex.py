@@ -1,6 +1,10 @@
 import re
 
 # Fonction pour extraire les dates au format dd/mm/yyyy
+
+"""
+ok pour : spark_compute_and_insert_adjustement_activity.hql
+"""
 def find_alias_after_parentheses(hive_query):
     """
     Trouve les alias qui suivent un FROM ou JOIN avec une sous-requête en parenthèses,
@@ -19,8 +23,6 @@ def find_alias_after_parentheses(hive_query):
     # Utilisation d'un lookahead négatif pour éviter la capture de 'AND' comme alias
     pattern = r'(?:FROM|JOIN|LEFT\sJOIN)\s*\(([^()]*+(?:\([^()]*+\))*[^()]*+)\)\s+([A-Za-z_][A-Za-z0-9_]*)\b(?!\s*AND\b)'
 
-    
-
     # Trouver toutes les correspondances
     matches = re.findall(pattern, hive_query)
 
@@ -31,8 +33,36 @@ def find_alias_after_parentheses(hive_query):
     alias_dict = {match[1]: match[0] for match in matches}
     return alias_dict
 
-# Exemple d'utilisation
-texte = """
+
+def find_alias_after_parentheses(hive_query):
+    """
+    Trouve les alias qui suivent un FROM ou JOIN avec une sous-requête en parenthèses,
+    en excluant 'AND' comme alias.
+
+    Args:
+        hive_query (str): La requête Hive à analyser.
+
+    Returns:
+        dict: Un dictionnaire {alias: sous-requête}.
+    """
+    # Supprimer les sauts de ligne pour simplifier l'analyse
+    hive_query = " ".join(hive_query.split())
+
+    # Expression régulière pour capturer les alias sur une sous-requête parenthésée
+    # On évite de capter 'AND' comme alias (lookahead négatif)
+    pattern = (
+        r"(?:FROM|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN)\s*"
+        r"\(([^()]*+(?:\([^()]*+\))*[^()]*+)\)\s+([A-Za-z_][A-Za-z0-9_]*)\b(?!\s*AND\b)"
+    )
+
+    matches = re.findall(pattern, hive_query, flags=re.IGNORECASE)
+    # Exemple: [("SELECT * FROM CDR.SPARK_IT_ZTE_ADJUSTMENT ...", "A"), ( ... )]
+
+    # Construire le dictionnaire alias -> sous-requête
+    alias_dict = {match[1].upper(): match[0] for match in matches}
+    return alias_dict
+
+hql="""
 INSERT INTO AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY PARTITION(TRANSACTION_DATE)
 SELECT
     COMMERCIAL_OFFER_CODE
@@ -113,7 +143,9 @@ FROM(
                , OPERATOR_CODE
     ) A
 """
-dates_trouvees = find_alias_after_parentheses(texte)
 
 # Affichage des dates trouvées
-#print(dates_trouvees[0])
+cor=find_alias_after_parentheses(hql)
+
+
+print(cor)

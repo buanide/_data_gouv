@@ -7,6 +7,7 @@ from pathlib import Path
 import sqlparse
 
 
+
 def list_all_files(directory: str) -> list:
     """
     Retourne tous les chemins de fichiers dans un répertoire, y compris les sous-répertoires.
