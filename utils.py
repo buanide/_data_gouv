@@ -11,8 +11,7 @@ import sqlparse
 def list_all_files(directory: str) -> list:
     """
     Retourne tous les chemins de fichiers dans un répertoire, y compris les sous-répertoires.
-    """
-    
+    """  
     file_paths = []
     for root, dirs, files in os.walk(directory):
         for file in files:
