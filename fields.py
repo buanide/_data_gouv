@@ -9,8 +9,6 @@ from sqlglot.optimizer.qualify import qualify
 from sqlglot.optimizer.scope import find_all_in_scope
 from sqlglot.optimizer.scope import build_scope
 
-
-
 def extract_table_names(query):
     """
     Recherche toutes les occurrences d'une clause du type :
@@ -38,7 +36,7 @@ def extract_table_names(query):
 def extract_lineage_fields(hive_sql):
     """
     Parse a Hive SQL query and extract the lineage fields.
-    por une table en clé on a un eliste de champs en valeurs
+    por une table en clé on a un liste de champs en valeurs
     """
     expression = sqlglot.parse_one(hive_sql, read="hive")
     expression_qualified = qualify(expression)
@@ -47,88 +45,35 @@ def extract_lineage_fields(hive_sql):
     
     for column in find_all_in_scope(root.expression, exp.Column):
         tables = extract_table_names(str(root.sources[column.table]))
-
         print(f"coloumn : {str(column).split('.')[1]} => source: {extract_table_names(str(root.sources[column.table]))}")
         print("")
         # Retirer les guillemets du champ
         a = str(column).split('.')[1].strip('"')
-
         for t in tables:
             # Si le nom de la table n'existe pas encore dans le dictionnaire,
             # on l'initialise à un set pour éviter les doublons.
             if t not in dic:
                 dic[t] = set()
             dic[t].add(a)
-
     # Si vous souhaitez avoir des listes au final (au lieu de sets):
     for t in dic:
         dic[t] = list(dic[t])
-
-
     return dic
-
-hive="""
-
-INSERT INTO AGG.FT_GLOBAL_ACTIVITY_DAILY PARTITION(TRANSACTION_DATE)
-SELECT
-C.PROFILE COMMERCIAL_OFFER_CODE
-, B.GLOBAL_CODE TRANSACTION_TYPE
-, IF(ACCT_RES_CODE='1','MAIN','PROMO') SUB_ACCOUNT
-, '+' TRANSACTION_SIGN
-, 'IN' SOURCE_PLATFORM
-, 'IT_ZTE_ADJUSTMENT' SOURCE_DATA
-, B.GLOBAL_CODE  SERVED_SERVICE
-, B.GLOBAL_USAGE_CODE SERVICE_CODE
-, 'DEST_ND' DESTINATION_CODE
-, NULL SERVED_LOCATION
-, NULL MEASUREMENT_UNIT
-, SUM(1) RATED_COUNT
-, SUM(1) RATED_VOLUME
-, SUM(CHARGE/100) TAXED_AMOUNT
-, SUM((1-0.1925) * CHARGE / 100 ) UNTAXED_AMOUNT
-, CURRENT_TIMESTAMP INSERT_DATE
-,'REVENUE' TRAFFIC_MEAN
-, C.OPERATOR_CODE OPERATOR_CODE
-, NULL LOCATION_CI
-, CREATE_DATE TRANSACTION_DATE
-FROM CDR.SPARK_IT_ZTE_ADJUSTMENT A
-LEFT JOIN (SELECT USAGE_CODE, GLOBAL_CODE, GLOBAL_USAGE_CODE, FLUX_SOURCE FROM DIM.DT_ZTE_USAGE_TYPE ) B ON B.USAGE_CODE = A.CHANNEL_ID
-LEFT JOIN (SELECT ACCESS_KEY, PROFILE, MAX(OPERATOR_CODE) OPERATOR_CODE 
-               FROM MON.SPARK_FT_CONTRACT_SNAPSHOT A
-               LEFT JOIN (SELECT ACCESS_KEY,MAX(EVENT_DATE) MAX_DATE FROM MON.SPARK_FT_CONTRACT_SNAPSHOT
-                          WHERE EVENT_DATE between date_sub('###SLICE_VALUE###',7) AND '###SLICE_VALUE###'
-                          GROUP BY ACCESS_KEY) B 
-                ON B.ACCESS_KEY = A.ACCESS_KEY AND B.MAX_DATE = A.EVENT_DATE
-               WHERE B.ACCESS_KEY IS NOT NULL                 
-               GROUP BY A.ACCESS_KEY, EVENT_DATE, PROFILE ) C
-ON C.ACCESS_KEY = GET_NNP_MSISDN_9DIGITS(A.ACC_NBR)
-WHERE CREATE_DATE = '###SLICE_VALUE###'  AND B.FLUX_SOURCE='ADJUSTMENT' AND CHANNEL_ID IN ('13','9','14','15','26','29','28','37', '109')
- AND CHARGE > 0
-GROUP BY
- C.PROFILE
-, B.GLOBAL_CODE
-, IF(ACCT_RES_CODE='1','MAIN','PROMO')
-, B.GLOBAL_CODE
-, B.GLOBAL_USAGE_CODE
-, C.OPERATOR_CODE
-, CREATE_DATE
-
-;
-"""
 
 def extract_table_details_with_partition_and_if_not_exists(file_path):
     """
-    Extrait le nom de la table, les noms des champs, les informations de partition 
-    et la présence de 'IF NOT EXISTS' d'une requête CREATE TABLE dans un fichier .hql.
-    
-    :param file_path: Chemin du fichier .hql
-    :return: Un tuple contenant le nom de la table, une liste des champs, les informations de partition et si 'IF NOT EXISTS' est utilisé
+    Extrait le nom de la table, les noms des champs, les informations de partition
+    et la présence de 'IF NOT EXISTS' d'une requête CREATE TABLE (ou CREATE EXTERNAL TABLE)
+    dans un fichier .hql.
+
+    Note : Dans cette version, tous les éléments (nom de table, noms de champs, clause de partition)
+    sont renvoyés en majuscules. 'if_not_exists' reste un booléen.
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             content = file.read()
         
-        # Adapter la regex pour prendre en compte 'IF NOT EXISTS', 'PARTITIONED BY' et autres options
+        # 1) CREATE TABLE IF NOT EXISTS ... PARTITIONED BY ...
         create_table_match = re.search(
             r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(\S+)\s*\((.*?)\)\s*(PARTITIONED\s+BY\s*\(.*?\))?\s*STORED\s+AS\s+\w+",
             content,
@@ -136,34 +81,59 @@ def extract_table_details_with_partition_and_if_not_exists(file_path):
         )
         
         if not create_table_match:
-            # Vérifier sans la partie 'IF NOT EXISTS' (au cas où elle est absente)
+            # 2) CREATE TABLE ... PARTITIONED BY ... (sans IF NOT EXISTS)
             create_table_match = re.search(
                 r"CREATE\s+TABLE\s+(\S+)\s*\((.*?)\)\s*(PARTITIONED\s+BY\s*\(.*?\))?\s*STORED\s+AS\s+\w+",
                 content,
                 re.DOTALL | re.IGNORECASE
             )
-            if not create_table_match:
-                print("Aucune requête CREATE TABLE partitionnée avec ou sans IF NOT EXISTS trouvée dans le fichier.")
-                return None, [], None, False
         
-        # Extraire le nom de la table
+            # 3) CREATE EXTERNAL TABLE (IF NOT EXISTS) ... LOCATION ...
+            if not create_table_match:
+                create_table_match = re.search(
+                    r"CREATE\s+EXTERNAL\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)\s*\((.*?)\)\s*(COMMENT\s+'.*?')?\s*ROW\s+FORMAT\s+DELIMITED\s+FIELDS\s+TERMINATED\s+BY\s+'.*?'\s*LOCATION\s+'(.*?)'",
+                    content,
+                    re.DOTALL | re.IGNORECASE
+                )
+                
+                if not create_table_match:
+                    print("Aucune requête CREATE (EXTERNAL) TABLE trouvée.")
+                    return None, [], None, False
+        
+        # Déterminer si IF NOT EXISTS est présent dans le contenu (optionnel)
+        if_not_exists = ("IF NOT EXISTS" in content.upper())
+        
+        # Nom de la table (group(1))
         table_name = create_table_match.group(1)
         
-        # Extraire le contenu entre parenthèses pour les champs
+        # Contenu entre parenthèses : colonnes (group(2))
         table_body = create_table_match.group(2)
         
-        # Utiliser une regex pour capturer les noms des champs
+        # Extraire les champs
         field_names = re.findall(r"\b(\w+)\b\s+\w+", table_body)
         
-        # Extraire le champ de partition (s'il existe)
-        partitioned_by = create_table_match.group(3)
+        # Par défaut, pas de partition
+        partitioned_by = None
         
-        # Vérifier la présence de 'IF NOT EXISTS'
-        if "IF NOT EXISTS" in content:
-            if_not_exists = True
-        else:
-            if_not_exists = False
-        
+        # Vérifier la présence de PARTITIONED BY dans la capture group(3)
+        if len(create_table_match.groups()) >= 3:
+            group3 = create_table_match.group(3)
+            if group3 and "PARTITIONED BY" in group3.upper():
+                partitioned_by = group3
+
+        # --- Convertir en MAJUSCULES ---
+        # 1) Table name
+        if table_name:
+            table_name = table_name.upper()
+
+        # 2) Field names
+        field_names = [f.upper() for f in field_names]
+
+        # 3) Partitioned by
+        if partitioned_by:
+            partitioned_by = partitioned_by.upper()
+
+        # 4) if_not_exists reste un booléen, pas de conversion en majuscules
         return table_name, field_names, partitioned_by, if_not_exists
     
     except FileNotFoundError:
@@ -172,7 +142,7 @@ def extract_table_details_with_partition_and_if_not_exists(file_path):
     except Exception as e:
         print(f"Erreur : {e}")
         return None, [], None, False
-
+    
 def process_hql_files(file_paths):
     """
     Traite une liste de chemins de fichiers HQL pour extraire le nom de la table et ses champs,
@@ -367,6 +337,56 @@ def print_lineage_dict(lineage_dict):
             print()  # ligne vide pour espacer
 
 
-path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\REPORT\GLOBAL_ACTIVITY\spark_compute_and_insert_adjustement_activity.hql"
-result = create_lineage_dic(path)
-print_lineage_dict(result)
+
+#path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\REPORT\GLOBAL_ACTIVITY\spark_compute_and_insert_adjustement_activity.hql"
+#result = create_lineage_dic(path)
+#print_lineage_dict(result)
+#file_scripts_paths=list_all_files(r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS')
+#create_table_dic=process_hql_files(file_scripts_paths)
+
+hql="""
+INSERT INTO AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY PARTITION(TRANSACTION_DATE)
+SELECT
+    C.PROFILE COMMERCIAL_OFFER_CODE
+     , B.GLOBAL_CODE TRANSACTION_TYPE
+     , IF(ACCT_RES_CODE='1','MAIN','PROMO') SUB_ACCOUNT
+     , '+' TRANSACTION_SIGN
+     , 'IN' SOURCE_PLATFORM
+     , 'IT_ZTE_ADJUSTMENT' SOURCE_DATA
+     , B.GLOBAL_CODE  SERVED_SERVICE
+     , B.GLOBAL_USAGE_CODE SERVICE_CODE
+     , 'DEST_ND' DESTINATION_CODE
+     , NULL SERVED_LOCATION
+     , NULL MEASUREMENT_UNIT
+     , SUM(1) RATED_COUNT
+     , SUM(1) RATED_VOLUME
+     , SUM(CHARGE/100) TAXED_AMOUNT
+     , SUM((1-0.1925) * CHARGE / 100 ) UNTAXED_AMOUNT
+     , CURRENT_TIMESTAMP INSERT_DATE
+     ,'REVENUE' TRAFFIC_MEAN
+     , C.OPERATOR_CODE OPERATOR_CODE
+     , NULL LOCATION_CI
+     , CREATE_DATE TRANSACTION_DATE
+FROM (SELECT * FROM CDR.SPARK_IT_ZTE_ADJUSTMENT WHERE CREATE_DATE = '###SLICE_VALUE###'  AND CHANNEL_ID IN ('13','9','14','15','26','29','28','37', '109','119', '120')
+  AND CHARGE > 0 ) A 
+         LEFT JOIN (SELECT USAGE_CODE, GLOBAL_CODE, GLOBAL_USAGE_CODE, FLUX_SOURCE FROM DIM.DT_ZTE_USAGE_TYPE  WHERE FLUX_SOURCE='ADJUSTMENT' ) B ON B.USAGE_CODE = A.CHANNEL_ID
+         LEFT JOIN ( 
+                    select ACCESS_KEY, PROFILE, MAX(OPERATOR_CODE) OPERATOR_CODE 
+                    from MON.SPARK_FT_CONTRACT_SNAPSHOT where EVENT_DATE = '###SLICE_VALUE###'
+                    group by ACCESS_KEY, PROFILE
+
+                    ) C
+                   ON C.ACCESS_KEY = GET_NNP_MSISDN_9DIGITS(A.ACC_NBR)
+GROUP BY
+    C.PROFILE
+       , B.GLOBAL_CODE
+       , IF(ACCT_RES_CODE='1','MAIN','PROMO')
+       , B.GLOBAL_CODE
+       , B.GLOBAL_USAGE_CODE
+       , C.OPERATOR_CODE
+       , CREATE_DATE
+
+"""
+
+dic_table_liste_champs=extract_lineage_fields(hql)
+    
