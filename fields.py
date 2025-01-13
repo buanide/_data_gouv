@@ -8,6 +8,7 @@ from sqlglot import parse_one
 from sqlglot.optimizer.qualify import qualify
 from sqlglot.optimizer.scope import find_all_in_scope
 from sqlglot.optimizer.scope import build_scope
+import pandas as pd
 
 def extract_table_names(query):
     """
@@ -36,7 +37,7 @@ def extract_table_names(query):
 def extract_lineage_fields(hive_sql):
     """
     Parse a Hive SQL query and extract the lineage fields.
-    por une table en clé on a un liste de champs en valeurs
+    pour une table en clé on a un liste de champs en valeurs
     """
     expression = sqlglot.parse_one(hive_sql, read="hive")
     expression_qualified = qualify(expression)
@@ -45,8 +46,8 @@ def extract_lineage_fields(hive_sql):
     
     for column in find_all_in_scope(root.expression, exp.Column):
         tables = extract_table_names(str(root.sources[column.table]))
-        print(f"coloumn : {str(column).split('.')[1]} => source: {extract_table_names(str(root.sources[column.table]))}")
-        print("")
+        #print(f"coloumn : {str(column).split('.')[1]} => source: {extract_table_names(str(root.sources[column.table]))}")
+        #print("")
         # Retirer les guillemets du champ
         a = str(column).split('.')[1].strip('"')
         for t in tables:
@@ -143,6 +144,273 @@ def extract_table_details_with_partition_and_if_not_exists(file_path):
         print(f"Erreur : {e}")
         return None, [], None, False
     
+
+
+def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
+    """
+    Tente de résoudre une colonne potentiellement ambiguë (ex: 'a.CHARGE')
+    en cherchant dans  le dictionnaire decrivant toutes les creates tables (results[file_path]) laquelle
+    possède ce champ dans 'fields'. 
+    Si il ne parvient pas à retrouver le nom dans le dictionnaire décrivant toutes les tables ils essaient de retrouver le champs
+    dans un dictionnaire de la forme 'dic_path' : {'mon.spark_ft_contract_snapshot': ['operator_code', 'access_key', 'profile'], 
+    'dim.dt_zte_usage_type': ['usage_code', 'global_code', 'global_usage_code'], 
+    'cdr.spark_it_zte_adjustment': ['channel_id', 'acct_res_code', 'acc_nbr', 'charge', 'create_date']}
+    Tous les noms sont comparés en minuscule.
+
+    :param column_name: ex: 'a.CHARGE' ou juste 'CHARGE'
+    :param file_path: la clé pour accéder à results[file_path]
+    :param results: dict de la forme
+        results[file_path] = [
+          {
+            "table_name": "mon.spark_ft_contract_snapshot",
+            "fields": ["charge", "main_credit", ...],
+            ...
+          },
+          ...
+        ]
+    :return: ex: "mon.spark_ft_contract_snapshot.charge" si trouvé,
+             ou la valeur d'origine si pas trouvé.
+    """
+     # 1) Isoler le col_name (sans alias)
+    split_col = column_name.split(".")
+    if len(split_col) == 2:
+        # alias = 'a', col_name = 'CHARGE' (ex.)
+        _, col_name = split_col
+    else:
+        # Pas de point => la colonne est directe
+        # (ex. col_name = 'CHARGE')
+        #col_name=column_name
+        pass
+
+    # 2) Convertir en majuscules pour la comparaison
+    col_name = col_name.strip('`"').upper()
+    for fp, table_info in results.items():
+        if not isinstance(table_info, dict):
+            continue
+        fields = table_info.get("fields", [])
+        fields_upper = [f.upper() for f in fields]
+        if col_name in fields_upper:
+            table_name = table_info.get("table_name", "").upper()  # on met le nom de table en maj
+            if table_name:
+                return f"{table_name}.{col_name}"   
+        else:
+            for table_name, fields in dic_path.items():
+                fields_upper = [f.upper() for f in fields]
+                if col_name in fields_upper:
+                    return f"{table_name.upper()}.{col_name}"
+
+    return column_name
+
+def analyze_projection(projection: exp.Expression,hql_content:str,results: dict) -> dict:
+    """
+    Analyse une projection pour extraire :
+      - columns_used : liste des colonnes (résolues si ambiguës) en minuscule
+      - aggregations : liste des fonctions d'agrégation
+      - arithmetic_ops : liste des opérations arithmétiques
+      - formula_sql : la reconstitution de la projection en SQL
+    """
+
+    columns_used = []
+    for col in projection.find_all(exp.Column):
+        table_part = col.table or ""
+        column_part = col.name
+        raw_column_name = f"{table_part}.{column_part}" if table_part else column_part
+        print("raw_column_name",raw_column_name)
+        dic_table_fields=extract_lineage_fields(hql_content)
+        #print("raw_column_name")
+        # Tenter de résoudre l'ambiguïté (ex. 'a.CHARGE' -> 'mon.spark_ft_contract_snapshot.charge')
+        resolved = resolve_column_alias(raw_column_name,dic_table_fields, results)
+        columns_used.append(resolved)
+
+    # Fonctions d'agrégation
+    agg_funcs = []
+    for func in projection.find_all(exp.AggFunc):
+        func_name = func.__class__.__name__.upper()
+        if isinstance(func, exp.Count) and func.is_star:
+            func_name = "COUNT(*)"
+        agg_funcs.append(func_name)
+
+    # Opérations arithmétiques
+    arithmetic_ops = []
+    ARITHMETIC_NODES = (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)
+    for node in projection.find_all(ARITHMETIC_NODES):
+        arithmetic_ops.append(type(node).__name__.upper())
+
+    formula_sql = projection.sql(dialect="hive")
+
+    return {
+        "columns_used": columns_used,
+        "aggregations": agg_funcs,
+        "arithmetic_ops": arithmetic_ops,
+        "formula_sql": formula_sql,
+    }
+
+
+def find_tables_in_select(select_expr: exp.Select) -> list:
+    """
+    Récupère toutes les tables mentionnées dans un SELECT donné
+    (FROM, JOIN, etc.), sans doublons.
+    Ex: ["mon.spark_ft_contract_snapshot", "dim.dt_zte_usage_type"]
+    """
+    tables = []
+    for table_expr in select_expr.find_all(exp.Table):
+        if table_expr.db:
+            tables.append(f"{table_expr.db}.{table_expr.name}")
+        else:
+            tables.append(table_expr.name)
+    return list(set(tables))
+
+
+def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
+    """
+    Lit une requête HQL depuis un fichier,
+    parse et qualifie la requête, puis construit un dictionnaire
+    de la forme :
+      {
+        "<chemin_fichier>.hql": {
+          "ALIAS_OR_NAME": {
+            "Alias/Projection": ...,
+            "Colonnes détectées": [...],
+            "Fonctions d'agg": [...],
+            "Opérations arithmétiques": [...],
+            "Formule SQL": ...,
+            "Table(s) utilisées": ...
+          },
+          ...
+        }
+      }
+    """
+    lineage_dict = {}
+
+    try:
+        with open(hql_file_path, 'r', encoding='utf-8') as f:
+            hql_content = f.read()
+    except FileNotFoundError:
+        print(f"Fichier introuvable: {hql_file_path}")
+        return {}
+
+    expression = sqlglot.parse_one(hql_content, read="hive")
+    if not expression:
+        print(f"Impossible de parser le HQL dans: {hql_file_path}")
+        return {}
+
+    expression_qualified = qualify(expression)
+    all_selects = list(expression_qualified.find_all(exp.Select))
+    lineage_dict[hql_file_path] = {}
+    for select_expr in all_selects:
+        tables_in_select = find_tables_in_select(select_expr)
+        tables_str = ", ".join(tables_in_select) if tables_in_select else "Aucune table"
+        for proj in select_expr.selects:
+            if isinstance(proj, exp.Alias):
+                alias_name = proj.alias or "NO_ALIAS"
+                expr_to_analyze = proj.this
+            else:
+                alias_name = proj.alias_or_name or "NO_ALIAS"
+                expr_to_analyze = proj
+            info = analyze_projection(expr_to_analyze,hql_content, results)
+            lineage_dict[hql_file_path][alias_name] = {
+                "Alias/Projection": alias_name,
+                "Colonnes détectées": info["columns_used"],
+                "agg": info["aggregations"],
+                "Opérations arithmétiques": info["arithmetic_ops"],
+                "Formule SQL": info["formula_sql"],
+                "Table(s) utilisées": tables_str
+            }
+
+    return lineage_dict
+
+def get_alias_table_in_dic(alias_name:str,dic_path:dict,results:dict,list_table:list)->str:
+    """
+    alias_name: alias ou colonnes dont on cherche la table
+    results: dictionnaire décrivant toutes les tables
+    dic_path: dictionnaire décrivant la requête hql 
+    """
+    for fp, table_info in results.items():
+        if not isinstance(table_info, dict):
+            continue
+        fields = table_info.get("fields", [])
+        fields_upper = [f.upper() for f in fields]
+        if alias_name.upper() in fields_upper:
+            #print("alias name in fields_upper",alias_name)
+            table_name = table_info.get("table_name", "").upper()  # on met le nom de table en maj
+            if table_name.lower() in list_table :
+                return f"{table_name}.{alias_name.upper()}"   
+            else:
+                for table_name, fields in dic_path.items():
+                    fields_upper = [f.upper() for f in fields]
+                    #print("table name lower",table_name.lower())
+                    #print("liset table",list_table)
+                    
+                   
+                    
+                    print("alias name", alias_name.upper(),"fields",fields_upper)
+
+                    #print('table name lower',table_name.lower(),"list_table",list_table)
+                    #print("")
+                   
+                    if alias_name.upper() in fields_upper and table_name.lower() in list_table:
+                        print("alias:",alias_name)
+                        print("table:",table_name)
+                        return f"{table_name.upper()}.{alias_name.upper()}"
+
+
+
+def print_lineage_dict(lineage_dict: dict):
+    """
+    Affiche le dictionnaire de lineage de manière lisible.
+    """
+    for hql_path, aliases_info in lineage_dict.items():
+        print(f"\n=== FICHIER HQL : {hql_path} ===")
+        for alias_name, details in aliases_info.items():
+            print(f"  - Alias/Projection : {alias_name}")
+            print(f"    Colonnes détectées       : {details['Colonnes détectées']}")
+            print(f"    Fonctions d'agg          : {details['agg']}")
+            print(f"    Opérations arithmétiques : {details['Opérations arithmétiques']}")
+            print(f"    Formule SQL              : {details['Formule SQL']}")
+            print(f"    Tables utilisées       : {details['Table(s) utilisées']}")
+            print()
+
+
+
+def export_lineage_to_excel(lineage_dict: dict, output_excel_path: str):
+    """
+    Exporte le dictionnaire de lineage dans un fichier Excel.
+
+    :param lineage_dict: dict, résultat de create_lineage_dic
+    :param output_excel_path: str, chemin du fichier Excel de sortie
+    """
+    # Liste pour stocker les lignes de l'Excel
+    excel_rows = []
+    for hql_path, aliases_info in lineage_dict.items():
+        for alias_name, details in aliases_info.items():
+            row = {
+                "Nom du Fichier": hql_path,
+                "Alias/Projection": alias_name,
+                "Colonnes détectées": ", ".join(details.get("Colonnes détectées", [])),
+                "agg": ", ".join(details.get("agg", [])),
+                "Opérations arithmétiques": ", ".join(details.get("Opérations arithmétiques", [])),
+                "Formule SQL": details.get("Formule SQL", ""),
+                "Tables utilisées": details.get("Table(s) utilisées", "")
+            }
+            excel_rows.append(row)
+
+    # Créer un DataFrame pandas
+    df = pd.DataFrame(excel_rows, columns=[
+        "Nom du Fichier",
+        "Alias/Projection",
+        "Colonnes détectées",
+        "agg",
+        "Opérations arithmétiques",
+        "Formule SQL",
+        "Tables utilisées"
+    ])
+    # Exporter le DataFrame vers Excel
+    try:
+        df.to_excel(output_excel_path, index=False)
+        print(f"Les résultats ont été exportés avec succès vers {output_excel_path}")
+    except Exception as e:
+        print(f"Erreur lors de l'exportation vers Excel: {e}")
+
 def process_hql_files(file_paths):
     """
     Traite une liste de chemins de fichiers HQL pour extraire le nom de la table et ses champs,
@@ -176,49 +444,6 @@ def process_hql_files(file_paths):
     return results
 
 
-def analyze_projection(projection: exp.Expression) -> dict:
-    """
-    Analyse une expression de projection (Alias(...) ou Colonne/fonction directe)
-    et retourne :
-      - Colonnes détectées
-      - Fonctions d'agrégation
-      - Opérations arithmétiques
-      - Formule SQL
-    """
-
-    # 1) Colonnes
-    columns_used = []
-    for col in projection.find_all(exp.Column):
-        # col.table, col.db, col.name
-        # On reconstruit par exemple table.col
-        table_part = col.table or "NO_TABLE"
-        columns_used.append(f"{table_part}.{col.name}")
-
-    # 2) Fonctions d'agrégation (SUM, COUNT, etc.)
-    agg_funcs = []
-    for func in projection.find_all(exp.AggFunc):
-        agg_func_name = func.__class__.__name__.upper()  # "SUM", "COUNT", ...
-        # Gérer le cas COUNT(*)
-        if isinstance(func, exp.Count) and func.is_star:
-            agg_func_name = "COUNT(*)"
-        agg_funcs.append(agg_func_name)
-
-    # 3) Opérations arithmétiques
-    arithmetic_ops = []
-    ARITHMETIC_NODES = (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)
-    for op in projection.find_all(ARITHMETIC_NODES):
-        arithmetic_ops.append(type(op).__name__.upper())  # "SUB", "MUL", ...
-
-    # 4) Formule SQL
-    formula_sql = projection.sql(dialect="hive")
-
-    return {
-        "columns_used": columns_used,
-        "aggregations": agg_funcs,
-        "arithmetic_ops": arithmetic_ops,
-        "formula_sql": formula_sql,
-    }
-
 def find_tables_in_select(select_expr: exp.Select) -> list:
     """
     Récupère toutes les tables mentionnées dans un SELECT donné
@@ -236,157 +461,10 @@ def find_tables_in_select(select_expr: exp.Select) -> list:
     return list(set(tables))  # on retire les doublons
 
 
-def create_lineage_dic(hql_file_path: str) -> dict:
-    """
-    Lit une requête HQL depuis un fichier,
-    parse et qualifie la requête, puis construit un dictionnaire
-    dont la clé est le chemin du fichier et la valeur est un dict
-    de la forme :
-
-    {
-      "ALIAS_NAME": {
-        "Alias/Projection": ALIAS_NAME,
-        "Colonnes détectées": [...],
-        "Fonctions d'agg": [...],
-        "Opérations arithmétiques": [...],
-        "Formule SQL": ...,
-        "Table(s) utilisées": ...
-      },
-      ...
-    }
-    """
-
-    # Dictionnaire final, avec en clé le chemin, et en valeur un autre dict
-    lineage_dict = {}
-
-    # 1. Lecture du fichier HQL
-    try:
-        with open(hql_file_path, 'r', encoding='utf-8') as f:
-            hql_content = f.read()
-    except FileNotFoundError:
-        print(f"Erreur : Le fichier '{hql_file_path}' n'a pas été trouvé.")
-        return {}  # ou raise
-
-    # 2. Parser la requête (dialecte Hive)
-    expression = sqlglot.parse_one(hql_content, read="hive")
-    if not expression:
-        print(f"Erreur : Impossible de parser la requête dans '{hql_file_path}'.")
-        return {}
-
-    # 3. Qualifier la requête (associer les colonnes à leurs tables si possible)
-    expression_qualified = qualify(expression)
-
-    # 4. Trouver tous les SELECT
-    all_selects = list(expression_qualified.find_all(exp.Select))
-
-    # 5. Préparer le dictionnaire pour ce fichier
-    #    => On veut un dict { "chemin fichier" : { alias: {...}, alias: {...} } }
-    lineage_dict[hql_file_path] = {}
-
-    # 6. Parcourir chaque SELECT
-    for select_expr in all_selects:
-        # Récupération des tables mentionnées
-        tables_in_select = find_tables_in_select(select_expr)
-        # On construit une chaîne pour "Table(s) utilisées"
-        if tables_in_select:
-            tables_str = ", ".join(tables_in_select)
-        else:
-            tables_str = "Aucune"
-
-        # 7. Parcourir chaque projection
-        for proj in select_expr.selects:
-            # alias ou nom de projection
-            if isinstance(proj, exp.Alias):
-                alias_name = proj.alias or "NO_ALIAS"
-                expr_to_analyze = proj.this
-            else:
-                alias_name = proj.alias_or_name or "NO_ALIAS"
-                expr_to_analyze = proj
-
-            # Extraire les infos sur la projection
-            info = analyze_projection(expr_to_analyze)
-
-            # Remplir la structure voulue
-            lineage_dict[hql_file_path][alias_name] = {
-                "Alias/Projection": alias_name,
-                "Colonnes": info["columns_used"],
-                "Fonctions agg": info["aggregations"],
-                "Ops": info["arithmetic_ops"],
-                "Formule SQL": info["formula_sql"],
-                "Table(s) utilisées": tables_str
-            }
-
-    return lineage_dict
-
-
-def print_lineage_dict(lineage_dict):
-    """
-    Affiche le dictionnaire de lineage de manière lisible.
-    :param lineage_dict: dictionnaire retourné par create_lineage_dic(...)
-    """
-
-    for hql_path, aliases_info in lineage_dict.items():
-        print(f"\n=== FICHIER HQL : {hql_path} ===")
-        for alias_name, details in aliases_info.items():
-            print(f"  - Alias/Projection : {alias_name}")
-            print(f"    Colonnes détectées       : {details['Colonnes']}")
-            print(f"    Fonctions d'agg          : {details['Fonctions agg']}")
-            print(f"    Opérations arithmétiques : {details['Ops']}")
-            print(f"    Formule SQL              : {details['Formule SQL']}")
-            print(f"    Table(s) utilisées       : {details['Table(s) utilisées']}")
-            print()  # ligne vide pour espacer
 
 
 
-#path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\REPORT\GLOBAL_ACTIVITY\spark_compute_and_insert_adjustement_activity.hql"
-#result = create_lineage_dic(path)
-#print_lineage_dict(result)
-#file_scripts_paths=list_all_files(r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS')
-#create_table_dic=process_hql_files(file_scripts_paths)
 
-hql="""
-INSERT INTO AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY PARTITION(TRANSACTION_DATE)
-SELECT
-    C.PROFILE COMMERCIAL_OFFER_CODE
-     , B.GLOBAL_CODE TRANSACTION_TYPE
-     , IF(ACCT_RES_CODE='1','MAIN','PROMO') SUB_ACCOUNT
-     , '+' TRANSACTION_SIGN
-     , 'IN' SOURCE_PLATFORM
-     , 'IT_ZTE_ADJUSTMENT' SOURCE_DATA
-     , B.GLOBAL_CODE  SERVED_SERVICE
-     , B.GLOBAL_USAGE_CODE SERVICE_CODE
-     , 'DEST_ND' DESTINATION_CODE
-     , NULL SERVED_LOCATION
-     , NULL MEASUREMENT_UNIT
-     , SUM(1) RATED_COUNT
-     , SUM(1) RATED_VOLUME
-     , SUM(CHARGE/100) TAXED_AMOUNT
-     , SUM((1-0.1925) * CHARGE / 100 ) UNTAXED_AMOUNT
-     , CURRENT_TIMESTAMP INSERT_DATE
-     ,'REVENUE' TRAFFIC_MEAN
-     , C.OPERATOR_CODE OPERATOR_CODE
-     , NULL LOCATION_CI
-     , CREATE_DATE TRANSACTION_DATE
-FROM (SELECT * FROM CDR.SPARK_IT_ZTE_ADJUSTMENT WHERE CREATE_DATE = '###SLICE_VALUE###'  AND CHANNEL_ID IN ('13','9','14','15','26','29','28','37', '109','119', '120')
-  AND CHARGE > 0 ) A 
-         LEFT JOIN (SELECT USAGE_CODE, GLOBAL_CODE, GLOBAL_USAGE_CODE, FLUX_SOURCE FROM DIM.DT_ZTE_USAGE_TYPE  WHERE FLUX_SOURCE='ADJUSTMENT' ) B ON B.USAGE_CODE = A.CHANNEL_ID
-         LEFT JOIN ( 
-                    select ACCESS_KEY, PROFILE, MAX(OPERATOR_CODE) OPERATOR_CODE 
-                    from MON.SPARK_FT_CONTRACT_SNAPSHOT where EVENT_DATE = '###SLICE_VALUE###'
-                    group by ACCESS_KEY, PROFILE
 
-                    ) C
-                   ON C.ACCESS_KEY = GET_NNP_MSISDN_9DIGITS(A.ACC_NBR)
-GROUP BY
-    C.PROFILE
-       , B.GLOBAL_CODE
-       , IF(ACCT_RES_CODE='1','MAIN','PROMO')
-       , B.GLOBAL_CODE
-       , B.GLOBAL_USAGE_CODE
-       , C.OPERATOR_CODE
-       , CREATE_DATE
 
-"""
-
-dic_table_liste_champs=extract_lineage_fields(hql)
     

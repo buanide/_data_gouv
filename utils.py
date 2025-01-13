@@ -106,7 +106,7 @@ def extract_tables_from_queries(queries: str) -> list:
 
 
 
-def extract_hive_table_and_queries(conf_dir: str) -> dict:
+def extract_hive_table_and_queries_paths(conf_dir: str) -> dict:
     """
     Permet d'extraire pour chaque fichier de configuration la table RDMS et Hive
     dans les fichiers conf utilisant sqoop.
@@ -152,7 +152,71 @@ def extract_hive_table_and_queries(conf_dir: str) -> dict:
 
                     # Extraire les tables des requêtes SQL
                     tables_rdms = extract_tables_from_queries(rdms_match.group(0) if rdms_match else "")
+                    #tables_hive = extract_tables_from_queries(hive_match.group(0) if hive_match else "")
+                    
+
+                    results[tables_rdms[0]] = {
+                        "table_data_hive_path": hive_match.group(0)
+                    }
+
+                    # Ajouter les tables aux ensembles globaux
+                    #total_rdms_tables.update(tables_rdms)
+                    #total_hive_tables.update(tables_hive)
+    except Exception as e:
+        print(f"Erreur lors de la recherche des fichiers dans {conf_dir}: {e}")
+    return results
+
+
+
+def extract_hive_table_and_queries(conf_dir: str) -> dict:
+    """
+    Permet d'extraire pour chaque fichier de configuration la table RDMS et Hive
+    dans les fichiers conf utilisant sqoop.
+
+    Args:
+        conf_dir (str): Chemin du répertoire contenant les fichiers de configuration.
+
+    Returns:
+        dict: Dictionnaire contenant en clé sle nom de la table rdms et valeur le chemin de sa table hive
+    """
+    results = {}
+    #total_rdms_tables = set()
+    #total_hive_tables = set()
+
+    try:
+        for root, dirs, files in os.walk(conf_dir):
+            for file in files:
+                if file.lower().startswith('sqoop') and file.lower().endswith('.conf') and 'cron' not in file.lower():
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                    except Exception as e:
+                        print(f"Erreur lors de la lecture du fichier {file_path}: {e}")
+                        continue
+
+                    rdms_pattern = re.compile(r'flux\.rdms\.pre-exec-queries\s*\+=\s*""".*?FROM\s+(\S+)\s+WHERE', re.IGNORECASE | re.DOTALL)
+                    rdms_match = rdms_pattern.search(content)
+                    if rdms_match:
+                        rdms_table = rdms_match.group(1)
+                        hive_pattern = re.compile(r'flux\.hive\.pre-exec-queries\s*\+=\s*""".*?FROM\s+(\S+)\s+WHERE', re.IGNORECASE | re.DOTALL)
+                        hive_match = hive_pattern.search(content)
+
+                        if hive_match:
+                            hive_table = hive_match.group(1)
+                        else:
+                            print(f"Aucune table Hive trouvée dans {file_path}")
+                            hive_table = None
+                    else:
+                        print(f"Aucune table RDMS trouvée dans {file_path}")
+                        rdms_table = None
+                        hive_table = None
+
+                    # Extraire les tables des requêtes SQL
+                    tables_rdms = extract_tables_from_queries(rdms_match.group(0) if rdms_match else "")
                     tables_hive = extract_tables_from_queries(hive_match.group(0) if hive_match else "")
+
+                    
 
                     results[file_path] = {
                         "table_data_rdms": tables_rdms,
@@ -265,7 +329,6 @@ def map_rdms_file_hql_file(dic_rdms_hive:dict, list_paths_scripts_hql:list) -> d
     - dict: Un dictionnaire avec en clé le nom de la table Hive (str) et en valeur une liste des chemins de fichiers HQL (list).
     """
     dic = {}
-
     # Préparer le pattern pour détecter les instructions INSERT INTO
     insert_into_pattern = r'\bINSERT\s+INTO\s+(?:TABLE\s+)?([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)(?:\s+PARTITION\s*\([^\)]*\))?'
 
