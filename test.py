@@ -67,16 +67,19 @@ paths_scripts=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS'
 file_scripts_paths=list_all_files(paths_scripts)
 create_table_dic=process_hql_files(file_scripts_paths)
 dic_table_fields=extract_lineage_fields(hql_content)
-directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
+
+#directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
 #liste_table=list(dic_table_fields.keys())
 
 
-#lineage_dic = create_lineage_dic(path,create_table_dic)
+lineage_dic = create_lineage_dic(path,create_table_dic)
 #extract_lineage_fields(hql)
 #print_lineage_dict(lineage_dic)  
-#export_lineage_to_excel(lineage_dic, "lineage_results_"+name_file+".xlsx")
-dic_rdms_hive=extract_hive_table_and_queries(directory_conf)     
-dict_table_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
+export_lineage_to_excel(lineage_dic, "lineage_results_2_"+name_file+".xlsx")
+#dic_rdms_hive=extract_hive_table_and_queries(directory_conf)     
+#dict_table_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
+#for i,value in dict_table_paths.items():
+#    print("i:",i,"value:",value)
 
 
 

@@ -216,8 +216,6 @@ def extract_hive_table_and_queries(conf_dir: str) -> dict:
                     tables_rdms = extract_tables_from_queries(rdms_match.group(0) if rdms_match else "")
                     tables_hive = extract_tables_from_queries(hive_match.group(0) if hive_match else "")
 
-                    
-
                     results[file_path] = {
                         "table_data_rdms": tables_rdms,
                         "table_data_hive": tables_hive

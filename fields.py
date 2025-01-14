@@ -61,6 +61,91 @@ def extract_lineage_fields(hive_sql):
         dic[t] = list(dic[t])
     return dic
 
+
+
+def extract_lineage_fields_2(hive_sql):
+    """
+    Analyse une requête Hive SQL pour extraire les alias, tables et champs associés.
+
+    Args:
+        hive_sql (str): La requête Hive SQL à analyser.
+
+    Returns:
+        dict: Dictionnaire où les clés sont les noms des tables et alias, 
+              et les valeurs sont des listes des champs associés.
+
+
+              key: mon.spark_ft_contract_snapshot valeur ['access_key', 'profile', 'operator_code']
+key: dim.dt_zte_usage_type valeur ['global_code', 'global_usage_code', 'usage_code']
+key: cdr.spark_it_zte_adjustment valeur ['acc_nbr', 'charge', 'create_date', 'channel_id', 'acct_res_code']
+    """
+    # Parser et qualifier la requête SQL
+    expression = parse_one(hive_sql, read="hive")
+    expression_qualified = qualify(expression)
+    root = build_scope(expression_qualified)
+
+    alias_to_table = {}
+    table_columns = {}
+
+    def process_expression(expression):
+        """
+        Parcourt récursivement une expression pour extraire les colonnes et leurs tables associées.
+
+        Args:
+            expression (sqlglot.Expression): L'expression à analyser.
+
+        Returns:
+            None: Met à jour directement les dictionnaires `alias_to_table` et `table_columns`.
+        """
+        if isinstance(expression, exp.Table):
+            # Ajouter une table directe
+            table_name = expression.name
+            alias = expression.alias_or_name
+            alias_to_table[alias] = table_name
+
+        elif isinstance(expression, exp.Subquery):
+            # Ajouter une sous-requête
+            alias = expression.alias_or_name
+            if alias:
+                alias_to_table[alias] = f"(subquery: {expression.this.sql()})"
+
+        elif isinstance(expression, exp.Column):
+            # Ajouter une colonne associée à un alias ou une table
+            alias = expression.table
+            column = expression.alias_or_name
+            if alias:
+                if alias not in table_columns:
+                    table_columns[alias] = set()
+                table_columns[alias].add(column)
+
+        # Parcourir récursivement les sous-expressions
+        for child in expression.args.values():
+            if isinstance(child, list):
+                for sub_child in child:
+                    if isinstance(sub_child, exp.Expression):
+                        process_expression(sub_child)
+            elif isinstance(child, exp.Expression):
+                process_expression(child)
+
+    # Traiter l'expression racine
+    process_expression(root.expression)
+
+    # Associer les alias aux tables principales (si possible)
+    resolved_table_columns = {}
+    for alias, table in alias_to_table.items():
+        if table in table_columns:
+            resolved_table_columns[table] = table_columns.get(alias, set())
+        elif alias in table_columns:
+            resolved_table_columns[alias] = table_columns[alias]
+        else:
+            resolved_table_columns[alias] = set()
+
+    # Convertir les sets en listes pour la sortie finale
+    for key in resolved_table_columns:
+        resolved_table_columns[key] = list(resolved_table_columns[key])
+
+    return resolved_table_columns
+
 def extract_table_details_with_partition_and_if_not_exists(file_path):
     """
     Extrait le nom de la table, les noms des champs, les informations de partition
@@ -148,14 +233,8 @@ def extract_table_details_with_partition_and_if_not_exists(file_path):
 
 def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
     """
-    Tente de résoudre une colonne potentiellement ambiguë (ex: 'a.CHARGE')
-    en cherchant dans  le dictionnaire decrivant toutes les creates tables (results[file_path]) laquelle
-    possède ce champ dans 'fields'. 
-    Si il ne parvient pas à retrouver le nom dans le dictionnaire décrivant toutes les tables ils essaient de retrouver le champs
-    dans un dictionnaire de la forme 'dic_path' : {'mon.spark_ft_contract_snapshot': ['operator_code', 'access_key', 'profile'], 
-    'dim.dt_zte_usage_type': ['usage_code', 'global_code', 'global_usage_code'], 
-    'cdr.spark_it_zte_adjustment': ['channel_id', 'acct_res_code', 'acc_nbr', 'charge', 'create_date']}
-    Tous les noms sont comparés en minuscule.
+    dic_path(dict) 'dic_path' : dictionnaire des table->list champs pour la requête courante
+    results(dict): dictionaire des provenant des requêtes create table, table->liste des champs
 
     :param column_name: ex: 'a.CHARGE' ou juste 'CHARGE'
     :param file_path: la clé pour accéder à results[file_path]
@@ -183,21 +262,25 @@ def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
         pass
 
     # 2) Convertir en majuscules pour la comparaison
-    col_name = col_name.strip('`"').upper()
-    for fp, table_info in results.items():
-        if not isinstance(table_info, dict):
-            continue
-        fields = table_info.get("fields", [])
+    
+    for table_name, fields in dic_path.items():
         fields_upper = [f.upper() for f in fields]
+        col_name = col_name.strip('`"').upper()
+        #print("col name",col_name)
         if col_name in fields_upper:
-            table_name = table_info.get("table_name", "").upper()  # on met le nom de table en maj
-            if table_name:
-                return f"{table_name}.{col_name}"   
+            #print('operator_code true')
+            return f"{table_name.upper()}.{col_name}"
         else:
-            for table_name, fields in dic_path.items():
+            col_name = col_name.strip('`"').upper()
+            for fp, table_info in results.items():
+                if not isinstance(table_info, dict):
+                    continue
+                fields = table_info.get("fields", [])
                 fields_upper = [f.upper() for f in fields]
                 if col_name in fields_upper:
-                    return f"{table_name.upper()}.{col_name}"
+                    table_name = table_info.get("table_name", "").upper()  # on met le nom de table en maj
+                    if table_name:
+                        return f"{table_name}.{col_name}"   
 
     return column_name
 
@@ -215,7 +298,7 @@ def analyze_projection(projection: exp.Expression,hql_content:str,results: dict)
         table_part = col.table or ""
         column_part = col.name
         raw_column_name = f"{table_part}.{column_part}" if table_part else column_part
-        print("raw_column_name",raw_column_name)
+        #print("raw_column_name",raw_column_name)
         dic_table_fields=extract_lineage_fields(hql_content)
         #print("raw_column_name")
         # Tenter de résoudre l'ambiguïté (ex. 'a.CHARGE' -> 'mon.spark_ft_contract_snapshot.charge')
