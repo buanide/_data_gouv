@@ -33,18 +33,20 @@ if __name__ == "__main__":
 
     #result = DDLParser(ddl).run(output_mode="hql")
     #print(result)
-    #dic_files_queries_paths = process_conf_files(directory_conf,root_dir)
+    dic_files_queries_paths = process_conf_files(directory_conf,root_dir)
+    for i,value in dic_files_queries_paths.items():
+        print("i",i,"value",value)
     # dic table hive -> dependances
     #dic_tables_dependances=get_dir_dependances(dic_files_queries_paths)
+    #get_dir_dependances()
     #table datawarehouse ->equivalent datalake
-    dic_rdms_hive=extract_hive_table_and_queries(directory_conf)
+    #dic_rdms_hive=extract_hive_table_and_queries(directory_conf)
     #generation des dependances de la table TANGO_CDR.IT_OMNY_USER_REGISTRATION_V2
     #display_table_dependencies(dic,"TANGO_CDR.IT_OMNY_USER_REGISTRATION_V2")
     #generate_excel_with_rdms_and_dependencies(dic_rdms_hive,dic_tables_dependances, "stephane.xlsx")
     #dic_rdms_paths_hive=extract_hive_table_and_queries_paths(directory_conf)
-    dic_rdms_fil_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
+    #dic_rdms_fil_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
 
-    for i, value in dic_rdms_fil_paths.items():
-        print("i:",i,"value:",value)
+    
 
     
