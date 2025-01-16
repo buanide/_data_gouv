@@ -17,6 +17,7 @@ from fields import get_alias_table_in_dic
 from utils import map_rdms_file_hql_file
 from utils import extract_hive_table_and_queries
 import os
+from utils import extract_exec_queries
 
 hql_content="""
 INSERT INTO AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY PARTITION(TRANSACTION_DATE)
@@ -72,15 +73,18 @@ dic_table_fields=extract_lineage_fields(hql_content)
 #liste_table=list(dic_table_fields.keys())
 
 
-lineage_dic = create_lineage_dic(path,create_table_dic)
+#lineage_dic = create_lineage_dic(path,create_table_dic)
 #extract_lineage_fields(hql)
 #print_lineage_dict(lineage_dic)  
-export_lineage_to_excel(lineage_dic, "lineage_results_2_"+name_file+".xlsx")
+#export_lineage_to_excel(lineage_dic, "lineage_results_2_"+name_file+".xlsx")
 #dic_rdms_hive=extract_hive_table_and_queries(directory_conf)     
 #dict_table_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
 #for i,value in dict_table_paths.items():
 #    print("i:",i,"value:",value)
 
 
+#a,b,c,d=extract_exec_queries(r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF\ZEBRA\IT\load-it-zebra-master.conf")
+
+#print("raw",c,"tt",d)
 
 

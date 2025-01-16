@@ -239,6 +239,8 @@ def extract_exec_queries(file_path: str) -> tuple:
     """
     pre_exec_queries = []
     exec_queries = []
+    raw=None
+    tt=None
 
     try:
         with open(file_path, 'r') as file:
@@ -254,10 +256,18 @@ def extract_exec_queries(file_path: str) -> tuple:
             if exec_matches:
                 exec_queries.extend(query.strip() for query in exec_matches)
 
+            src_temp_matches = re.findall(r'flux\.hdfs\.src-temp-tt-dir-regex\s*=\s*"([^"]+)"', content)
+            if src_temp_matches:
+                raw=src_temp_matches[0].strip()
+
+            dest_temp_matches = re.findall(r'flux\.hdfs\.dest-temp-tt-dir\s*=\s*"([^"]+)"', content)
+            if dest_temp_matches:
+                tt=dest_temp_matches[0].strip()
+
     except Exception as e:
         print(f"Erreur lors du traitement du fichier {file_path}: {e}")
 
-    return pre_exec_queries, exec_queries
+    return pre_exec_queries, exec_queries,raw,tt
 
 
 
@@ -277,7 +287,7 @@ def process_conf_files(directory:str,hdfs_directory:str) -> dict:
     for root, dirs, files in os.walk(directory):
         for file in files:
             path = os.path.join(root, file)
-            pre_exec_queries, exec_queries = extract_exec_queries(path)
+            pre_exec_queries, exec_queries,raw,tt = extract_exec_queries(path)
             paths_pre_exec_queries = []
             path_exec_queries=[]
             if pre_exec_queries:
@@ -308,7 +318,7 @@ def process_conf_files(directory:str,hdfs_directory:str) -> dict:
                     else:
                         print("ce n'est pas un chemin, fonction,process_conf_files", query)
 
-            dic_conf_queries[path] = {'pre_exec': paths_pre_exec_queries, 'exec': path_exec_queries}
+            dic_conf_queries[path] = {'pre_exec': paths_pre_exec_queries, 'exec': path_exec_queries,'raw_directory':raw,'tt_directory':tt}
 
     return dic_conf_queries
                  
