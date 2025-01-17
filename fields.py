@@ -42,14 +42,18 @@ def extract_lineage_fields(hive_sql):
     expression = sqlglot.parse_one(hive_sql, read="hive")
     expression_qualified = qualify(expression)
     root = build_scope(expression_qualified)
+    #print("root",root)
     dic = {}
     
     for column in find_all_in_scope(root.expression, exp.Column):
+        #print(root.sources)
         tables = extract_table_names(str(root.sources[column.table]))
         #print(f"coloumn : {str(column).split('.')[1]} => source: {extract_table_names(str(root.sources[column.table]))}")
         #print("")
         # Retirer les guillemets du champ
+        #print("expre",str(column))
         a = str(column).split('.')[1].strip('"')
+        #print("champs",a)
         for t in tables:
             # Si le nom de la table n'existe pas encore dans le dictionnaire,
             # on l'initialise à un set pour éviter les doublons.
@@ -61,90 +65,6 @@ def extract_lineage_fields(hive_sql):
         dic[t] = list(dic[t])
     return dic
 
-
-
-def extract_lineage_fields_2(hive_sql):
-    """
-    Analyse une requête Hive SQL pour extraire les alias, tables et champs associés.
-
-    Args:
-        hive_sql (str): La requête Hive SQL à analyser.
-
-    Returns:
-        dict: Dictionnaire où les clés sont les noms des tables et alias, 
-              et les valeurs sont des listes des champs associés.
-
-
-              key: mon.spark_ft_contract_snapshot valeur ['access_key', 'profile', 'operator_code']
-key: dim.dt_zte_usage_type valeur ['global_code', 'global_usage_code', 'usage_code']
-key: cdr.spark_it_zte_adjustment valeur ['acc_nbr', 'charge', 'create_date', 'channel_id', 'acct_res_code']
-    """
-    # Parser et qualifier la requête SQL
-    expression = parse_one(hive_sql, read="hive")
-    expression_qualified = qualify(expression)
-    root = build_scope(expression_qualified)
-
-    alias_to_table = {}
-    table_columns = {}
-
-    def process_expression(expression):
-        """
-        Parcourt récursivement une expression pour extraire les colonnes et leurs tables associées.
-
-        Args:
-            expression (sqlglot.Expression): L'expression à analyser.
-
-        Returns:
-            None: Met à jour directement les dictionnaires `alias_to_table` et `table_columns`.
-        """
-        if isinstance(expression, exp.Table):
-            # Ajouter une table directe
-            table_name = expression.name
-            alias = expression.alias_or_name
-            alias_to_table[alias] = table_name
-
-        elif isinstance(expression, exp.Subquery):
-            # Ajouter une sous-requête
-            alias = expression.alias_or_name
-            if alias:
-                alias_to_table[alias] = f"(subquery: {expression.this.sql()})"
-
-        elif isinstance(expression, exp.Column):
-            # Ajouter une colonne associée à un alias ou une table
-            alias = expression.table
-            column = expression.alias_or_name
-            if alias:
-                if alias not in table_columns:
-                    table_columns[alias] = set()
-                table_columns[alias].add(column)
-
-        # Parcourir récursivement les sous-expressions
-        for child in expression.args.values():
-            if isinstance(child, list):
-                for sub_child in child:
-                    if isinstance(sub_child, exp.Expression):
-                        process_expression(sub_child)
-            elif isinstance(child, exp.Expression):
-                process_expression(child)
-
-    # Traiter l'expression racine
-    process_expression(root.expression)
-
-    # Associer les alias aux tables principales (si possible)
-    resolved_table_columns = {}
-    for alias, table in alias_to_table.items():
-        if table in table_columns:
-            resolved_table_columns[table] = table_columns.get(alias, set())
-        elif alias in table_columns:
-            resolved_table_columns[alias] = table_columns[alias]
-        else:
-            resolved_table_columns[alias] = set()
-
-    # Convertir les sets en listes pour la sortie finale
-    for key in resolved_table_columns:
-        resolved_table_columns[key] = list(resolved_table_columns[key])
-
-    return resolved_table_columns
 
 def extract_table_details_with_partition_and_if_not_exists(file_path):
     """
@@ -279,8 +199,10 @@ def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
                 fields_upper = [f.upper() for f in fields]
                 if col_name in fields_upper:
                     table_name = table_info.get("table_name", "").upper()  # on met le nom de table en maj
-                    if table_name:
-                        return f"{table_name}.{col_name}"   
+                    if table_name and table_name in dic_path:
+                        return f"{table_name}.{col_name}" 
+                    else:
+                        continue  
 
     return column_name
 
@@ -294,6 +216,8 @@ def analyze_projection(projection: exp.Expression,hql_content:str,results: dict)
     """
 
     columns_used = []
+    print("projection",projection)
+
     for col in projection.find_all(exp.Column):
         table_part = col.table or ""
         column_part = col.name
@@ -319,6 +243,7 @@ def analyze_projection(projection: exp.Expression,hql_content:str,results: dict)
     for node in projection.find_all(ARITHMETIC_NODES):
         arithmetic_ops.append(type(node).__name__.upper())
 
+   
     formula_sql = projection.sql(dialect="hive")
 
     return {
@@ -327,6 +252,7 @@ def analyze_projection(projection: exp.Expression,hql_content:str,results: dict)
         "arithmetic_ops": arithmetic_ops,
         "formula_sql": formula_sql,
     }
+
 
 
 def find_tables_in_select(select_expr: exp.Select) -> list:
@@ -387,6 +313,9 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
             if isinstance(proj, exp.Alias):
                 alias_name = proj.alias or "NO_ALIAS"
                 expr_to_analyze = proj.this
+        
+    
+                
             else:
                 alias_name = proj.alias_or_name or "NO_ALIAS"
                 expr_to_analyze = proj
