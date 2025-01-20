@@ -13,7 +13,6 @@ from fields import extract_lineage_fields
 from fields import export_lineage_to_excel
 from fields import create_lineage_dic
 from fields import print_lineage_dict
-from fields import get_alias_table_in_dic
 from utils import map_rdms_file_hql_file
 from utils import extract_hive_table_and_queries
 import os
@@ -108,20 +107,16 @@ file_scripts_paths=list_all_files(paths_scripts)
 create_table_dic=process_hql_files(file_scripts_paths)
 dic_table_fields=extract_lineage_fields(hql_content)
 
-#directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
+directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
 #liste_table=list(dic_table_fields.keys())
 lineage_dic = create_lineage_dic(path,create_table_dic)
 #extract_lineage_fields(hql_content)
-print_lineage_dict(lineage_dic)  
-#export_lineage_to_excel(lineage_dic, "lineage_results_2_"+name_file+".xlsx")
+#print_lineage_dict(lineage_dic)  
+export_lineage_to_excel(lineage_dic, "lineage_results_pardon_"+name_file+".xlsx")
 #dic_rdms_hive=extract_hive_table_and_queries(directory_conf)     
 #dict_table_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
 #print("liste champs")
-
-
-
 #a,b,c,d=extract_exec_queries(r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF\ZEBRA\IT\load-it-zebra-master.conf")
-
 #print("raw",c,"tt",d)
 
 

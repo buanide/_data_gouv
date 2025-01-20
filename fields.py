@@ -45,6 +45,7 @@ def extract_lineage_fields(hive_sql):
     #print("root",root)
     dic = {}
     
+
     for column in find_all_in_scope(root.expression, exp.Column):
         #print(root.sources)
         tables = extract_table_names(str(root.sources[column.table]))
@@ -171,10 +172,17 @@ def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
              ou la valeur d'origine si pas trouvé.
     """
      # 1) Isoler le col_name (sans alias)
+    #print("column_name",column_name)
     split_col = column_name.split(".")
+    #print("split_col:",split_col,"taille:",len(split_col))
     if len(split_col) == 2:
         # alias = 'a', col_name = 'CHARGE' (ex.)
         _, col_name = split_col
+        return col_name
+    elif len(split_col) == 3:
+         col_name=split_col[2]
+         return col_name
+         #print("col_name",col_name)
     else:
         # Pas de point => la colonne est directe
         # (ex. col_name = 'CHARGE')
@@ -189,7 +197,7 @@ def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
         #print("col name",col_name)
         if col_name in fields_upper:
             #print('operator_code true')
-            return f"{table_name.upper()}.{col_name}"
+            return f"{col_name}"
         else:
             col_name = col_name.strip('`"').upper()
             for fp, table_info in results.items():
@@ -200,7 +208,7 @@ def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
                 if col_name in fields_upper:
                     table_name = table_info.get("table_name", "").upper()  # on met le nom de table en maj
                     if table_name and table_name in dic_path:
-                        return f"{table_name}.{col_name}" 
+                        return f"{col_name}" 
                     else:
                         continue  
 
@@ -216,10 +224,14 @@ def analyze_projection(projection: exp.Expression,hql_content:str,results: dict)
     """
 
     columns_used = []
-    print("projection",projection)
+    
 
     for col in projection.find_all(exp.Column):
-        table_part = col.table or ""
+        if col.db:
+            table_part = f"{col.db}.{col.table}" or ""
+        else:
+            table_part = col.table or ""
+
         column_part = col.name
         raw_column_name = f"{table_part}.{column_part}" if table_part else column_part
         #print("raw_column_name",raw_column_name)
@@ -263,11 +275,33 @@ def find_tables_in_select(select_expr: exp.Select) -> list:
     """
     tables = []
     for table_expr in select_expr.find_all(exp.Table):
+        print("table_expr",table_expr)
         if table_expr.db:
+            print("db",table_expr.db)
             tables.append(f"{table_expr.db}.{table_expr.name}")
         else:
             tables.append(table_expr.name)
     return list(set(tables))
+
+
+def get_col_name_without_table(col_name: str) -> str:
+    """
+    
+    """
+    # 1) Remove outer quotes
+    col_no_quotes = col_name.replace('"', "")  
+    # e.g. "ft_contract_snapshot"."operator_code" -> ft_contract_snapshot.operator_code
+
+    # 2) Split on the first dot (if any)
+    parts = col_no_quotes.split(".", 1)  
+    # e.g. ["ft_contract_snapshot", "operator_code"]
+    #print("parts",parts)
+    
+    if len(parts)==2:
+        return parts[1]
+
+    else:
+        return parts[0]
 
 
 def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
@@ -304,25 +338,29 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
         return {}
 
     expression_qualified = qualify(expression)
+    root_scope = build_scope(expression_qualified)
     all_selects = list(expression_qualified.find_all(exp.Select))
     lineage_dict[hql_file_path] = {}
     for select_expr in all_selects:
         tables_in_select = find_tables_in_select(select_expr)
+        #print("tablein select",tables_in_select)
         tables_str = ", ".join(tables_in_select) if tables_in_select else "Aucune table"
         for proj in select_expr.selects:
             if isinstance(proj, exp.Alias):
                 alias_name = proj.alias or "NO_ALIAS"
                 expr_to_analyze = proj.this
-        
-    
-                
+                #print("expr to analyze",expr_to_analyze)
+                #print(repr(proj))
+  
             else:
                 alias_name = proj.alias_or_name or "NO_ALIAS"
                 expr_to_analyze = proj
             info = analyze_projection(expr_to_analyze,hql_content, results)
+
             lineage_dict[hql_file_path][alias_name] = {
                 "Alias/Projection": alias_name,
                 "Colonnes détectées": info["columns_used"],
+                #"Schema": schemas_par_col,
                 "agg": info["aggregations"],
                 "Opérations arithmétiques": info["arithmetic_ops"],
                 "Formule SQL": info["formula_sql"],
@@ -331,39 +369,7 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
 
     return lineage_dict
 
-def get_alias_table_in_dic(alias_name:str,dic_path:dict,results:dict,list_table:list)->str:
-    """
-    alias_name: alias ou colonnes dont on cherche la table
-    results: dictionnaire décrivant toutes les tables
-    dic_path: dictionnaire décrivant la requête hql 
-    """
-    for fp, table_info in results.items():
-        if not isinstance(table_info, dict):
-            continue
-        fields = table_info.get("fields", [])
-        fields_upper = [f.upper() for f in fields]
-        if alias_name.upper() in fields_upper:
-            #print("alias name in fields_upper",alias_name)
-            table_name = table_info.get("table_name", "").upper()  # on met le nom de table en maj
-            if table_name.lower() in list_table :
-                return f"{table_name}.{alias_name.upper()}"   
-            else:
-                for table_name, fields in dic_path.items():
-                    fields_upper = [f.upper() for f in fields]
-                    #print("table name lower",table_name.lower())
-                    #print("liset table",list_table)
-                    
-                   
-                    
-                    print("alias name", alias_name.upper(),"fields",fields_upper)
 
-                    #print('table name lower',table_name.lower(),"list_table",list_table)
-                    #print("")
-                   
-                    if alias_name.upper() in fields_upper and table_name.lower() in list_table:
-                        print("alias:",alias_name)
-                        print("table:",table_name)
-                        return f"{table_name.upper()}.{alias_name.upper()}"
 
 
 
@@ -398,6 +404,7 @@ def export_lineage_to_excel(lineage_dict: dict, output_excel_path: str):
             row = {
                 "Nom du Fichier": hql_path,
                 "Alias/Projection": alias_name,
+                "Schema":details.get("Schema", ""),
                 "Colonnes détectées": ", ".join(details.get("Colonnes détectées", [])),
                 "agg": ", ".join(details.get("agg", [])),
                 "Opérations arithmétiques": ", ".join(details.get("Opérations arithmétiques", [])),
