@@ -239,8 +239,10 @@ def extract_exec_queries(file_path: str) -> tuple:
     """
     pre_exec_queries = []
     exec_queries = []
+    hive_var=[]
     raw=None
     tt=None
+    cdr=None
 
     try:
         with open(file_path, 'r') as file:
@@ -263,11 +265,23 @@ def extract_exec_queries(file_path: str) -> tuple:
             dest_temp_matches = re.findall(r'flux\.hdfs\.dest-temp-tt-dir\s*=\s*"([^"]+)"', content)
             if dest_temp_matches:
                 tt=dest_temp_matches[0].strip()
+            
+            cdr_matches = re.findall(r'flux\.hive\.extra-conf\s*\+=\s*"([^"]+)"', content)
+            #print("cdr_matches",cdr_matches)
+            if cdr_matches:
+                hive_var.extend(var.strip() for var in cdr_matches)
+
+            for var in cdr_matches:
+                    match = re.search(r'--hivevar\s+tt_table_name\s*=\s*([^\s]+)', var)
+                    if match:
+                        cdr=match.group(1)
+                        if cdr:
+                            cdr=cdr.upper()
 
     except Exception as e:
         print(f"Erreur lors du traitement du fichier {file_path}: {e}")
 
-    return pre_exec_queries, exec_queries,raw,tt
+    return pre_exec_queries, exec_queries,raw,tt,cdr
 
 
 
@@ -287,7 +301,7 @@ def process_conf_files(directory:str,hdfs_directory:str) -> dict:
     for root, dirs, files in os.walk(directory):
         for file in files:
             path = os.path.join(root, file)
-            pre_exec_queries, exec_queries,raw,tt = extract_exec_queries(path)
+            pre_exec_queries, exec_queries,raw,tt,cdr = extract_exec_queries(path)
             paths_pre_exec_queries = []
             path_exec_queries=[]
             if pre_exec_queries:
@@ -318,7 +332,7 @@ def process_conf_files(directory:str,hdfs_directory:str) -> dict:
                     else:
                         print("ce n'est pas un chemin, fonction,process_conf_files", query)
 
-            dic_conf_queries[path] = {'pre_exec': paths_pre_exec_queries, 'exec': path_exec_queries,'raw_directory':raw,'tt_directory':tt}
+            dic_conf_queries[path] = {'pre_exec': paths_pre_exec_queries, 'exec': path_exec_queries,'raw_directory':raw,'tt_directory':tt,'cdr_tt':cdr}
 
     return dic_conf_queries
                  
@@ -546,6 +560,7 @@ def get_dir_dependances(dic_files_queries_paths:dict) -> dict:
                     dic[main_table] = set()
                 if main_table:
                     dic[main_table].update(dependent_tables)
+                    
 
         if queries['pre_exec']:
             for q in queries['pre_exec']:
@@ -554,11 +569,55 @@ def get_dir_dependances(dic_files_queries_paths:dict) -> dict:
                     dic[main_table] = set()
                 if main_table:
                     dic[main_table].update(dependent_tables)
+                    
 
     for table in dic:
         dic[table] = list(dic[table])
 
     return dic
+
+def get_dir_dependances_2(dic_files_queries_paths: dict) -> dict:
+    """
+    Retourne un dictionnaire contenant les dépendances des tables du datalake et leur valeur 'raw'.
+
+    Args:
+        dic_files_queries_paths (dict): Dictionnaire contenant les chemins des fichiers et leurs requêtes.
+
+    Returns:
+        dict: Dictionnaire des dépendances avec la clé `raw` pour chaque table principale.
+    """
+    dic = {}
+    
+    for file_path, queries in dic_files_queries_paths.items():
+        # Récupérer la valeur 'raw' pour le fichier actuel
+        raw_path = queries.get('raw_directory', None)
+        cdr_name=queries.get('cdr_tt',None)
+        
+
+        # Traiter les requêtes 'exec'
+        if queries['exec']:
+            for q in queries['exec']:
+                dependent_tables, main_table = extract_data_sources(q)
+                if main_table:
+                    if main_table not in dic:
+                        dic[main_table] = {'dependances': set(), 'raw_directory': raw_path,'cdr_name':cdr_name}
+                    dic[main_table]['dependances'].update(dependent_tables)
+        
+        # Traiter les requêtes 'pre_exec'
+        if queries['pre_exec']:
+            for q in queries['pre_exec']:
+                dependent_tables, main_table = extract_data_sources(q)
+                if main_table:
+                    if main_table not in dic:
+                        dic[main_table] = {'dependances': set(), 'raw_directory': raw_path,'cdr_name':cdr_name}
+                    dic[main_table]['dependances'].update(dependent_tables)
+    
+    # Convertir les dépendances en listes pour chaque table
+    for table in dic:
+        dic[table]['dependances'] = list(dic[table]['dependances'])
+    
+    return dic
+
 
 
 def display_table_dependencies(dependency_map:dict, table_name:str) -> None:
@@ -622,6 +681,82 @@ def display_table_dependencies(dependency_map:dict, table_name:str) -> None:
     output_file = f"{table_name}_dependencies.xlsx"
     df.to_excel(output_file, index=False)
     print(f"Les dépendances de la table '{table_name}' ont été exportées vers : {output_file}")
+
+
+def display_table_dependencies_2(dependency_map: dict, table_name: str) -> None:
+    """
+    Affiche les dépendances d'une table spécifique du datalake, y compris le chemin 'raw', et les écrit dans un fichier Excel.
+
+    Args:
+        dependency_map (dict): Dictionnaire des dépendances {table_principale: {'dependances': [dépendances], 'raw': chemin_raw}}.
+        table_name (str): Nom de la table pour laquelle afficher les dépendances.
+    """
+    # Liste pour stocker les chemins uniques de dépendances
+    unique_paths = set()
+
+    def get_all_dependencies(table, current_path, visited):
+        """
+        Explore toutes les dépendances d'une table en profondeur et ajoute chaque chemin unique.
+
+        Args:
+            table (str): La table pour laquelle les dépendances doivent être explorées.
+            current_path (list): Le chemin courant (accumulé).
+            visited (set): Ensemble des tables déjà visitées pour éviter les cycles.
+        """
+        if table in visited:
+            # Cycle détecté, ajouter le chemin avec une indication
+            unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
+            return
+
+        # Ajouter la table courante au chemin
+        current_path = current_path + [table]
+
+        # Si la table n'a pas de dépendances, ajouter le chemin complet
+        if table not in dependency_map or not dependency_map[table].get('dependances', []):
+            unique_paths.add(tuple(current_path))
+            return
+
+        # Marquer la table comme visitée
+        visited.add(table)
+
+        # Parcourir les dépendances et continuer l'exploration
+        for dependency in dependency_map[table]['dependances']:
+            get_all_dependencies(dependency, current_path, visited.copy())
+
+    # Vérifier si la table existe dans le dictionnaire
+    if table_name in dependency_map:
+        get_all_dependencies(table_name, [], set())
+    else:
+        print(f"La table '{table_name}' n'existe pas dans le dictionnaire.")
+        return
+
+    # Convertir les chemins uniques en lignes pour le DataFrame
+    rows = [list(path) for path in unique_paths]
+
+    # Ajouter la colonne RAW pour la table principale comme dernière colonne
+
+    
+    for row in rows:
+        raw_value = None
+        for key, value in dependency_map.items():
+            if value.get('cdr_name') == row[-1]:
+                raw_value = value.get('raw_directory')
+                #print('raw_value',raw_value)
+                break
+        row.append(raw_value)
+
+    # Déterminer le nombre maximum de colonnes pour formater correctement
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_Principale"] + [f"Dépendance{i}" for i in range(1, max_columns)] 
+
+    # Créer un DataFrame avec les données collectées
+    df = pd.DataFrame(rows, columns=columns)
+
+    # Exporter les données vers un fichier Excel
+    output_file = f"{table_name}_dependencies.xlsx"
+    df.to_excel(output_file, index=False)
+    print(f"Les dépendances de la table '{table_name}' ont été exportées vers : {output_file}")
+
 
 
 def redirect_error(list_to_redirect):

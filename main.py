@@ -1,12 +1,12 @@
 from utils import extract_data_sources
 from utils import process_conf_files
 from utils import extract_tables_from_queries
-from utils import get_dir_dependances
+from utils import get_dir_dependances_2
 from utils import extract_hive_table_and_queries
 from utils import map_rdms_file_hql_file
 from utils import list_all_files
 from utils import generate_excel_with_rdms_and_dependencies
-from utils import display_table_dependencies
+from utils import display_table_dependencies_2
 from utils import parse_hql_file
 from sqllineage.runner import LineageRunner
 from simple_ddl_parser import parse_from_file
@@ -34,16 +34,20 @@ if __name__ == "__main__":
     #result = DDLParser(ddl).run(output_mode="hql")
     #print(result)
     dic_files_queries_paths = process_conf_files(directory_conf,root_dir)
-    for i,value in dic_files_queries_paths.items():
-        print("i",i,"value",value)
+    #for i,value in dic_files_queries_paths.items():
+        #print("i",i,"value",value)
     # dic table hive -> dependances
-    #dic_tables_dependances=get_dir_dependances(dic_files_queries_paths)
+    
+    dic_tables_dependances=get_dir_dependances_2(dic_files_queries_paths)
+
     #get_dir_dependances()
     #table datawarehouse ->equivalent datalake
     #dic_rdms_hive=extract_hive_table_and_queries(directory_conf)
     #generation des dependances de la table TANGO_CDR.IT_OMNY_USER_REGISTRATION_V2
-    #display_table_dependencies(dic,"TANGO_CDR.IT_OMNY_USER_REGISTRATION_V2")
-    #generate_excel_with_rdms_and_dependencies(dic_rdms_hive,dic_tables_dependances, "stephane.xlsx")
+    #for i,value in dic_tables_dependances.items():
+    #        print("table",i,"dependances",value)
+    display_table_dependencies_2(dic_tables_dependances,"AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY")
+    #generate_excel_with_rdms_and_dependencies(dic_rdms_hive,dic_tables_dependances, "dependecies_with_raw.xlsx")
     #dic_rdms_paths_hive=extract_hive_table_and_queries_paths(directory_conf)
     #dic_rdms_fil_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
 
