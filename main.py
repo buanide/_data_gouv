@@ -39,7 +39,6 @@ if __name__ == "__main__":
     # dic table hive -> dependances
     
     dic_tables_dependances=get_dir_dependances_2(dic_files_queries_paths)
-
     #get_dir_dependances()
     #table datawarehouse ->equivalent datalake
     #dic_rdms_hive=extract_hive_table_and_queries(directory_conf)

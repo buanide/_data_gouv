@@ -39,10 +39,10 @@ def read_json(input_file):
 
 # Chemin du fichier JSON
 input_file = r"C:\Users\YBQB7360\Documents\fichier_formate.json"  
-
+#output_file=r"C:\Users\YBQB7360\Documents\Data gouvernance\ocm_data_gouv\schema_flow_file_form.json"
+#to_format(input_file,output_file)
 # Lecture du fichier JSON et stockage dans un dictionnaire
 data_dict = read_json(input_file)
-
 def generate_json_schema(data):
     # Parcourt récursivement les types de données
     if isinstance(data, dict):
@@ -62,14 +62,18 @@ def generate_json_schema(data):
     else:
         return {}
     
-def extract_variables(data):
+def extract_variables(data,search_key):
+    """
+    permet de rechercher toutes les occurences d'une clé
+    """
     variables_list = []
+    dic={}
 
     # Parcours récursif des données
     def recursive_search(obj):
         if isinstance(obj, dict):
             for key, value in obj.items():
-                if key == "variables":
+                if key == search_key:
                     variables_list.append(value)  # Ajouter le contenu de "variables"
                 recursive_search(value)  # Explorer le sous-dictionnaire
         elif isinstance(obj, list):
@@ -79,10 +83,69 @@ def extract_variables(data):
     recursive_search(data)
     return variables_list
 
-variables_content=extract_variables(data_dict)
+def extract_dict(data, search_key, search_value):
+    """
+    Retourne tous les dictionnaires contenant une clé particulière avec une valeur spécifique
+    """
+    matching_dicts = []
+
+    # Parcours récursif des données
+    def recursive_search(obj):
+        if isinstance(obj, dict):
+            if search_key in obj and obj[search_key] == search_value:
+                matching_dicts.append(obj)  # Ajouter le dictionnaire contenant la clé et la valeur
+            for key, value in obj.items():
+                recursive_search(value)  # Explorer les sous-dictionnaires
+        elif isinstance(obj, list):
+            for item in obj:
+                recursive_search(item)  # Explorer chaque élément de la liste
+
+    recursive_search(data)
+    return matching_dicts
+
+
+key="variables"
+variables_content=extract_variables(data_dict,key)
 dic_staging_raw={}
 staging=None
 rep_raw=None
+
+# Vérification du contenu du dictionnaire
+
+if data_dict is not None:
+    print("Contenu du dictionnaire chargé avec succès.")
+    # Exemple : Extraction des dictionnaires contenant la clé 'componentType' avec la valeur 'PROCESS_GROUP'
+    search_key = "componentType"
+    search_value = "PROCESS_GROUP"
+    results = extract_dict(data_dict, search_key, search_value)
+    # Afficher les résultats
+    if results:
+        for i, result in enumerate(results, start=1):
+            print(f"Dictionnaire #{i} contenant la clé '{search_key}' avec la valeur '{search_value}':")
+            if 'componentType' in result.keys():
+                componentType=result.get('componentType',None)
+                print("componentType",componentType)
+
+                for i,value in enumerate(result, start=1):
+                    print("value dans dico",value)
+                    
+
+            if 'scheduledState' in result.keys():
+                scheduledState=result.get('scheduledState',None)
+                print("scheduledState",scheduledState)
+
+            
+
+            #print(json.dumps(result, indent=4, ensure_ascii=False))
+            #break
+    else:
+        print(f"Aucun dictionnaire ne contient la clé '{search_key}' avec la valeur '{search_value}'.")
+        #print(json.dumps(result, indent=4, ensure_ascii=False))
+
+#schema = generate_json_schema(data_dict)
+#print(schema)
+
+"""
 for idx, variables in enumerate(variables_content, start=1):
     print(f"Clé 'variables' #{idx}:")
 
@@ -97,11 +160,9 @@ for idx, variables in enumerate(variables_content, start=1):
         if rep_raw == None:
             rep_raw=variables.get('flux.hdfs.raw',None)
 
-    print("rep raw:",rep_raw,"staging",staging)
-        
-    
-    
-    """
+    print("rep raw:",rep_raw,"stockage dict",staging)
+
+
     for key, value in variables.items():
         print(f"  {key}: {value}")
         if key=='flux.sftp.remote-path':
@@ -113,15 +174,15 @@ for idx, variables in enumerate(variables_content, start=1):
         if rep_raw and staging:
             print("staging_directory:",staging,"raw:",rep_raw)
                 #dic_staging_raw[idx]={'staging_directory':staging,'raw':rep_raw}
-    """
+
 
 #print(variables_content[1])
 #for i, content in enumerate(variables_content, start=1):
  #   print(f"Contenu de 'variables' #{i}: {json.dumps(content, indent=4)}")
 
 
-    #schema = generate_json_schema(data_dict)
-    #print(schema)
+#schema = generate_json_schema(data_dict)
+#print(schema)
 
 # Vérification du contenu du dictionnaire
 #if data_dict is not None:
@@ -144,9 +205,7 @@ for idx, variables in enumerate(variables_content, start=1):
         #n+=1
         #if n==15:
         #    break
-
-
-
 # Extraction des dictionnaires avec la clé "variables"
 #dic_identifier=extract_identifiers(input_file)
 #print(dic_identifier)
+"""
