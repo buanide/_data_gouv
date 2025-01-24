@@ -111,37 +111,86 @@ staging=None
 rep_raw=None
 
 # Vérification du contenu du dictionnaire
+def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
+    """
+    Permet d'extraire les process groups actifs.
 
-if data_dict is not None:
-    print("Contenu du dictionnaire chargé avec succès.")
-    # Exemple : Extraction des dictionnaires contenant la clé 'componentType' avec la valeur 'PROCESS_GROUP'
-    search_key = "componentType"
-    search_value = "PROCESS_GROUP"
-    results = extract_dict(data_dict, search_key, search_value)
-    # Afficher les résultats
-    if results:
-        for i, result in enumerate(results, start=1):
-            print(f"Dictionnaire #{i} contenant la clé '{search_key}' avec la valeur '{search_value}':")
-            if 'componentType' in result.keys():
-                componentType=result.get('componentType',None)
-                print("componentType",componentType)
+    Args:
+        data_dict (dict): Dictionnaire contenant les données à analyser.
+        search_key (str): Clé à rechercher dans les dictionnaires.
+        search_value (str): Valeur associée à la clé à rechercher.
 
-                for i,value in enumerate(result, start=1):
-                    print("value dans dico",value)
-                    
+    Returns:
+        tuple: Deux dictionnaires :
+            - dic_process_group : {index: [listes des états programmés des processeurs]}
+            - dic_status : {index: 'ENABLED' ou 'DISABLED'}
+    """
+    if data_dict is not None:
+        print("Contenu du dictionnaire chargé avec succès.")
+        # Exemple : Extraction des dictionnaires contenant la clé 'componentType' avec la valeur 'PROCESS_GROUP'
+       
+        results = extract_dict(data_dict, search_key, search_value)
+        # parcours des process group
+        dic_process_group={}
+        dc_info_process_group={}
+        dic_status={}
+        if results:
+            for i, result in enumerate(results, start=1):
+                #print(f"Dictionnaire #{i} contenant la clé '{search_key}' avec la valeur '{search_value}':")
+                if 'componentType' in result.keys():
+                    componentType=result.get('componentType',None)
+                    #print("componentType",componentType)
+                    variables=extract_variables(result,'variables')
+                    #print("variables",variables)
 
-            if 'scheduledState' in result.keys():
-                scheduledState=result.get('scheduledState',None)
-                print("scheduledState",scheduledState)
-
-            
-
+                if 'processors' in result.keys():
+                    processors=result.get('processors',None)
+                    nb_processors=len(processors)
+                    nb_scheduled_states=0
+                    nb_enable_schedule_state=0
+                    list_scheduled_states=[]
+                    for p in processors:
+                        for process, values in p.items():
+                            #print("processs",process)
+                            #print("values",values)
+                            if 'scheduledState' in p.keys():
+                                #print("status",)
+                                scheduledState=p.get('scheduledState',None)
+                                if scheduledState:
+                                    list_scheduled_states.append(scheduledState)
+         # verifier les chiffres la prochaine fois
+                    nb_enabled=list_scheduled_states.count('ENABLED')
+                    nb_disabled=list_scheduled_states.count('DISABLED')
+                                #list_scheduled_states.append(scheduledState)
+                
+                #dic_process_group[i]=list_scheduled_states
+                print("nb_disabled",nb_disabled,"nb_processors",nb_processors)
+                #dc_info_process_group[i]={'nb_processors':nb_processors,}
+            """
+            for i,value in dic_process_group.items():
+                if 'ENABLED' in value:
+                    dic_status[i]='ENABLED'
+                else:
+                    dic_status[i]='DISABLED'
+            """
             #print(json.dumps(result, indent=4, ensure_ascii=False))
             #break
     else:
         print(f"Aucun dictionnaire ne contient la clé '{search_key}' avec la valeur '{search_value}'.")
         #print(json.dumps(result, indent=4, ensure_ascii=False))
 
+    return dic_process_group,dic_status
+
+search_key = "componentType"
+search_value = "PROCESS_GROUP"
+dic_process_group,dic_status=create_scheduled_group_dict(data_dict,search_key,search_value)
+
+"""
+for key in dic_process_group:
+    value1 = dic_process_group[key]
+    value2 = dic_status[key]
+    print(f"Clé: {key} | Valeur dans dict1: {value1} | Valeur dans dict2: {value2}")
+"""
 #schema = generate_json_schema(data_dict)
 #print(schema)
 
