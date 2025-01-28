@@ -100,23 +100,34 @@ FROM(
 ) A;
 """
 
-path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\REPORT\GLOBAL_ACTIVITY\compute_and_insert_contract_snapshot_activity.hql"
-name_file=os.path.basename(path)
-paths_scripts=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS'
-file_scripts_paths=list_all_files(paths_scripts)
-create_table_dic=process_hql_files(file_scripts_paths)
-dic_table_fields=extract_lineage_fields(hql_content)
+#path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\REPORT\GLOBAL_ACTIVITY\compute_and_insert_contract_snapshot_activity.hql"
+#name_file=os.path.basename(path)
+#paths_scripts=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS'
+#file_scripts_paths=list_all_files(paths_scripts)
+#create_table_dic=process_hql_files(file_scripts_paths)
+#dic_table_fields=extract_lineage_fields(hql_content)
 
-directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
+#directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
 #liste_table=list(dic_table_fields.keys())
-lineage_dic = create_lineage_dic(path,create_table_dic)
+#lineage_dic = create_lineage_dic(path,create_table_dic)
 #extract_lineage_fields(hql_content)
 #print_lineage_dict(lineage_dic)  
-export_lineage_to_excel(lineage_dic, "lineage_results_pardon_"+name_file+".xlsx")
+#export_lineage_to_excel(lineage_dic, "lineage_results_pardon_"+name_file+".xlsx")
 #dic_rdms_hive=extract_hive_table_and_queries(directory_conf)     
 #dict_table_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
 #print("liste champs")
 #a,b,c,d=extract_exec_queries(r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF\ZEBRA\IT\load-it-zebra-master.conf")
 #print("raw",c,"tt",d)
+
+ohrr = r"/PROD/RAW/IN_ZTE"
+parts = ohrr.split("/")  
+# parts = ["", "PROD", "RAW", "IN_ZTE", "PRICE_PLAN_EXTRACT", "Data_*"]
+if len(parts) > 3:
+    # Rejoindre tous les éléments sauf le dernier ("Data_*")
+    # Cela donnera: "/PROD/RAW/IN_ZTE/PRICE_PLAN_EXTRACT"
+    path = "/".join(parts[:-1])
+    print(path)
+else:
+    path=ohrr
 
 

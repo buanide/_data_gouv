@@ -239,8 +239,8 @@ def create_dic_identifier(data_dict:dict,key:str):
 
 key="processGroups"
 dic_identifier=create_dic_identifier(data_dict,key)
-for i,value in dic_identifier.items():
-    print("id",i,"name",value)
+#for i,value in dic_identifier.items():
+#    print("id",i,"name",value)
 
 
 
@@ -329,11 +329,15 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
 search_key = "componentType"
 search_value = "PROCESS_GROUP"
 
-#dic_process_group=create_scheduled_group_dict(data_dict,search_key,search_value)
+dic_process_group=create_scheduled_group_dict(data_dict,search_key,search_value)
 #create_excel_from_dict(dic_process_group, output_file=r"C:\Users\YBQB7360\Documents\Data gouvernance\process_group.xlsx")
 
 #for i,value in dic_process_group.items():
  #   print("i",i,"value",value)
+
+
+
+
 
 #schema = generate_json_schema(data_dict)
 #print(schema)

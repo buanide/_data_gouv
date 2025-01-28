@@ -497,14 +497,14 @@ def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict,
         """
         if table in visited:
             # Cycle détecté, ajouter le chemin avec une indication
-            unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
+            #unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
             return
 
         # Ajouter la table courante au chemin
         current_path = current_path + [table]
 
         # Si la table n'a pas de dépendances, ajouter le chemin complet
-        if table not in dependency_map or not dependency_map[table]:
+        if table not in dependency_map or not dependency_map[table].get('dependances', []):
             unique_paths.add(tuple(current_path))
             return
 
@@ -512,7 +512,7 @@ def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict,
         visited.add(table)
 
         # Parcourir les dépendances et continuer l'exploration
-        for dependency in dependency_map[table]:
+        for dependency in dependency_map[table]['dependances']:
             get_all_dependencies(dependency, current_path, visited.copy())
 
     # Traitement des associations RDMS -> Hive et dépendances Hive
@@ -531,9 +531,25 @@ def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict,
     # Convertir les chemins uniques en lignes pour le DataFrame
     rows = [list(path) for path in unique_paths]
 
+    # ajout des chemins raw
+    for row in rows:
+        raw_value = None
+        for key, value in dependency_map.items():
+            if value.get('cdr_name') == row[-1]:
+                raw_value = value.get('raw_directory')
+                #print('raw_value',raw_value)
+                
+        row.append(raw_value)
+    
+    dic_dependences={}
     # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
-    max_columns = max(len(row) for row in rows)
-    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns - 2)]
+
+    for row in range(0,len(rows)):
+        dic_dependences[rows[row][0]]={'dependencies':rows[row]}
+    
+    """
+    #max_columns = max(len(row) for row in rows)
+    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns-2)]
 
     # Créer un DataFrame avec les données collectées
     df = pd.DataFrame(rows, columns=columns)
@@ -543,6 +559,9 @@ def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict,
     # Exporter le DataFrame vers un fichier Excel
     df_unique.to_excel(output_file, index=False)
     print(f"Fichier Excel généré avec succès : {output_file}")
+    """
+
+    return dic_dependences
 
 
 
@@ -669,6 +688,7 @@ def display_table_dependencies(dependency_map:dict, table_name:str) -> None:
 
     # Convertir les chemins uniques en lignes pour le DataFrame
     rows = [list(path) for path in unique_paths]
+
 
     # Déterminer le nombre maximum de colonnes pour formater correctement
     max_columns = max(len(row) for row in rows)
