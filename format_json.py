@@ -204,6 +204,7 @@ def get_values_variables(data):
         
         if 'flux.hdfs.subdir-names' in variables.keys():
             subdir_names=variables.get('flux.hdfs.subdir-names',None)
+            
 
         if 'flux.sftp.port' in variables.keys():
             port=variables.get('flux.sftp.port',None)
