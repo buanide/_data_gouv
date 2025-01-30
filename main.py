@@ -74,68 +74,8 @@ if __name__ == "__main__":
 
     dic_process_group=create_scheduled_group_dict(dic_nifi_flow_file,search_key,search_value)
 
-    def strucure_dic(dic_process_group:dict,dic_dependencies:dict):
-        """
-        Construit un dictionnaire contenant un le chemin du répertoire raw et son serveur associé, pour chaque table détectée, 
-        le répertoire raw (dossier source) et l'éventuel serveur associé.
-        dic_process_group: dictionnaire contenant les informations sur les process groupes
-        dic_dependencies: dictionnaire contenant les informations sur les dépendances des tables du datawarehouse
-        """
-        dic={}
 
-        # pour chaque process group, on récupère le répertoire raw et le serveur associé
-        for process,elements in dic_process_group.items():
-            rep_raw=elements.get('rep_raw')
-            server=None
-            #print("num:",i,"process:",value)
-            if rep_raw!=None:
-                for i,value in dic_dependencies.items():
-                    list_server=set()
-                    dependencies=value.get('dependencies')
-                    last=dependencies[-1]
-                    # on récupère la dernière dépendance qui être un répertoire raw
-                    if last!=None and last.startswith("/"):
-                        raw=last
-                        if raw=="/PROD/RAW/OM/TRANSACTIONS/Transactions*":
-                            tab_raw = raw.split("/")
-                            if len(tab_raw) > 3:
-                                second_to_last = tab_raw[-2]
-                                #print("second_to_last",second_to_last)
-                                # on reconstruit le chemin du répertoire raw d'une table CDR jusqu'à son troisième élément pour le comparer avec le répertoire raw du process group
-                                path_to_search = "/".join(tab_raw[:4])
-                                #print("path_to_search",path_to_search)
-                                #print("subdir",subdir)
-                                if path_to_search == rep_raw:
-                                    subdir=elements.get('subdir')
-                                    if elements.get('staging')!=None:
-                                        #print("server",elements.get('staging'),'subdir',subdir)
-                                        if subdir!=None:
-                                            print("subdir here",subdir,"second_to_last",second_to_last,"path_to_search",path_to_search)
-                                            # on vérifie que le répertoire qu'un sous répertoire de la raw du CDR se trouve dans la liste des sous répertoirs des process group 
-                                            if second_to_last in subdir:
-                                                print("subdir",subdir,"second_to_last",second_to_last)
-                                                #server=elements.get('staging')      
-                                            elif second_to_last==subdir:
-                                                print("subdir equal",subdir,"second_to_last",second_to_last)
-                                                #server=elements.get('staging')
-                                        else:
-                                            print("subdir vide")
-                                            #print("pas de subdir pour:",path_to_search,"server:",elements.get('staging'))
-                                            #server=elements.get('staging')
-                                            #list_server.append(server)
-                                    #else:
-                                       #print("path_to_search:",path_to_search,"server Inconnu","groupIdentifier:",elements.get('groupIdentifier'))
-                            else :
-                                print("autre cas")
-                        dic[i]={"raw":raw,"server":list_server}
-        return dic
-    
-
-    import logging
-
-
-
-    def structure_dic_2(dic_process_group: dict, dic_dependencies: dict):
+    def structure_dic(dic_process_group: dict, dic_dependencies: dict):
         """
         Construit un dictionnaire contenant le chemin du répertoire raw et tous les serveurs associés pour chaque table détectée.
 
@@ -152,6 +92,93 @@ if __name__ == "__main__":
             dependencies = value.get('dependencies', [])
             if not dependencies:
                 continue  # Skip empty dependencies
+            last_dependency = dependencies[-1]  # Get the last dependency
+            if last_dependency and last_dependency.startswith("/"):
+                raw_path = last_dependency  # Detected raw directory
+                # Extract the first 4 parts of the path to get the base raw directory
+                tab_raw = raw_path.split("/")
+                if len(tab_raw) > 3:
+                    raw_base_path = "/".join(tab_raw[:4])  # Example: "/PROD/RAW/OM"
+                    # Collect all servers for this raw path
+                    list_servers = set()
+                    staging_server=None
+                    for process, elements in dic_process_group.items():
+                        subdir = elements.get('subdir')
+                        rep_raw = elements.get('rep_raw')
+                        group_Identifier=elements.get('groupIdentifier')
+                        flux_name = elements.get('flux_name')
+                        # check if the raw path matches the process group raw path
+                        if rep_raw and rep_raw == raw_base_path:
+                            second_to_last = tab_raw[-2]
+                            if subdir!=None:
+                                # Check if subdir matches second_to_last
+                                if second_to_last in subdir or second_to_last == subdir:
+                                    staging_server = elements.get('staging')
+                                    #list_servers.add(staging_server)
+                                    flux_name = elements.get('flux_name')
+                                    group_Identifier=elements.get('groupIdentifier')
+                                    nb_processors=elements.get('nb_processors')
+                                    nb_processors_disabeled=elements.get('nb_disabled')
+                                    if staging_server!=None:
+                                        
+                                        dic[staging_server] = {"raw": raw_path,"flux_name":flux_name,"group_Identifier":group_Identifier,"nb_processors":nb_processors,"nb_processors_disabeled":nb_processors_disabeled}
+                                    
+        
+                            else:
+                                staging_server = elements.get('staging')
+                                #list_servers.add(staging_server)
+                                flux_name = elements.get('flux_name')
+                                nb_processors=elements.get('nb_processors')
+                                nb_processors_disabeled=elements.get('nb_disabled')
+                                if staging_server!=None:  
+                                    dic[staging_server] = {"raw": raw_path,"flux_name":flux_name,"group_Identifier":group_Identifier,"nb_processors":nb_processors,"nb_processors_disabeled":nb_processors_disabeled}
+                        else:
+                            # si on a un une raw coposé de deuéléments par exemple PROD/RAW dans le nifijson file
+                            # on regarde dans le nifi file si l'avant dernier élément de la raw du renseigné 
+                            # dans le projet est contenu dans les sous répertoirs de a raw du nifi file
+                            if subdir!=None:
+                                second_to_last = tab_raw[-2]
+                                if second_to_last in subdir or second_to_last == subdir:
+                                    #print("subdir",subdir,"second_to_last",second_to_last,"rep_raw",rep_raw)
+                                    staging_server = elements.get('staging')
+                                    list_servers.add(staging_server)
+                                    flux_name = elements.get('flux_name')
+                                    group_Identifier=elements.get('groupIdentifier')
+                                    if staging_server!=None:
+                                          for i,value in dic_process_group.items():
+                                            group_Identifier_check=value.get('groupIdentifier')
+                                            if group_Identifier_check==group_Identifier:
+                                                nb_processors=value.get('nb_processors')
+                                                nb_processors_disabeled=value.get('nb_disabled')
+
+                                          dic[staging_server] = {"raw": raw_path,"flux_name":flux_name,"group_Identifier":group_Identifier,"nb_processors":nb_processors,"nb_processors_disabeled":nb_processors_disabeled}
+                     
+                    # Save the raw path and its associated servers
+                
+                
+                #dic[table] = {"raw": raw_path, "servers": list(list_servers),"flux_name":flux_name}
+
+        return dic
+    
+
+    def structure_dic_2(dic_process_group: dict, dic_dependencies: dict):
+        """
+        Constructs a dictionary where each server (staging) is a key, 
+        and the associated raw path, number of processors, and flux name are stored in a nested dictionary.
+
+        Args:
+            dic_process_group (dict): Information on process groups with keys 'rep_raw', 'staging', 'subdir', 'nb_processors', etc.
+            dic_dependencies (dict): Dependencies for the data warehouse tables.
+
+        Returns:
+            dict: A dictionary where each server (staging) is a key, and its associated raw path, nb_processors, and flux_name are stored.
+        """
+        dic = {}
+
+        for value in dic_dependencies.values():
+            dependencies = value.get('dependencies', [])
+            if not dependencies:
+                continue  # Skip if there are no dependencies
 
             last_dependency = dependencies[-1]  # Get the last dependency
             if last_dependency and last_dependency.startswith("/"):
@@ -162,35 +189,40 @@ if __name__ == "__main__":
                 if len(tab_raw) > 3:
                     raw_base_path = "/".join(tab_raw[:4])  # Example: "/PROD/RAW/OM"
 
-                    # Collect all servers for this raw path
-                    list_servers = set()
-
                     for process, elements in dic_process_group.items():
-                        rep_raw = elements.get('rep_raw')
                         subdir = elements.get('subdir')
-                        staging_server = elements.get('staging')
+                        rep_raw = elements.get('rep_raw')
+                        nb_processors = elements.get('nb_processors', 0)
+                        staging_server = elements.get('staging')  # Use this as the key
+                        flux_name = elements.get('flux_name', '')
 
-                        # Check if the raw path matches
-                        if rep_raw and rep_raw == raw_base_path:
-                            second_to_last = tab_raw[-2]  # Extract second-to-last directory
+                        if rep_raw and rep_raw == raw_base_path and staging_server:
+                            second_to_last = tab_raw[-2]
 
-                            if subdir:
-                                # Check if subdir matches second_to_last
-                                if second_to_last in subdir or second_to_last == subdir:
-                                    list_servers.add(staging_server)
-                            else:
-                                list_servers.add(staging_server)  # If no subdir, still add
-
-                    # Save the raw path and its associated servers
-                    dic[table] = {"raw": raw_path, "servers": list(list_servers)}
+                            # If subdir exists and matches the expected structure
+                            if subdir and (second_to_last in subdir or second_to_last == subdir):
+                                dic[staging_server] = {
+                                    "raw": raw_path,
+                                    "server":staging_server,
+                                    "nb_processors": nb_processors,
+                                    "flux_name": flux_name
+                                }
+                            elif not subdir:
+                                dic[staging_server] = {
+                                    "server":staging_server,
+                                    "raw": raw_path,
+                                    "nb_processors": nb_processors,
+                                    "flux_name": flux_name
+                                }
 
         return dic
 
+   #18313f9f-beec-18e7-84b5-451d52b6e6e0 
     #dic=strucure_dic(dic_process_group,dic_dependencies)
-    dic=structure_dic_2(dic_process_group,dic_dependencies)
+    dic=structure_dic(dic_process_group,dic_dependencies)
 
     for i,value in dic.items():
-        print("raw:",value.get('raw'),"servers:",value.get('servers'))
+        print("raw:",value.get('raw'),"server:",i,"flux_name:",value.get('flux_name'),"group identifier",value.get('group_Identifier'),"nb_processors",value.get('nb_processors'),"nb_processors_disabled",value.get('nb_processors_disabeled'))
     
         #if last.startswith("/"):
         #    server=last

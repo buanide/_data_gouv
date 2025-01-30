@@ -238,6 +238,8 @@ def create_dic_identifier(data_dict:dict,key:str):
             dic_identifier[i] = {'name': name, 'identifier': identifier}
     return dic_identifier
 
+
+
 key="processGroups"
 dic_identifier=create_dic_identifier(data_dict,key)
 #for i,value in dic_identifier.items():
