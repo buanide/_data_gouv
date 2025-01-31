@@ -119,15 +119,16 @@ FROM(
 #a,b,c,d=extract_exec_queries(r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF\ZEBRA\IT\load-it-zebra-master.conf")
 #print("raw",c,"tt",d)
 
-ohrr = r"/PROD/RAW/IN_ZTE"
-parts = ohrr.split("/")  
+ohrr = r"ange"
+parts = ohrr.split(";")  
 # parts = ["", "PROD", "RAW", "IN_ZTE", "PRICE_PLAN_EXTRACT", "Data_*"]
-if len(parts) > 3:
+print(parts)
+#if len(parts) > 3:
     # Rejoindre tous les éléments sauf le dernier ("Data_*")
     # Cela donnera: "/PROD/RAW/IN_ZTE/PRICE_PLAN_EXTRACT"
-    path = "/".join(parts[:-1])
-    print(path)
-else:
-    path=ohrr
+#    path = "/".join(parts[:-1])
+#    print(path)
+#else:
+#    path=ohrr
 
 

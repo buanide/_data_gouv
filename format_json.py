@@ -189,6 +189,7 @@ def get_values_variables(data):
     subdir_names=None
     port=None
     flux_name=None
+    ip_adress=None
     for idx, variables in enumerate(data, start=1):
         #print(f"Clé 'variables' #{idx}:")
         if 'flux.sftp.remote-path' in variables.keys():
@@ -204,6 +205,9 @@ def get_values_variables(data):
         
         if 'flux.hdfs.subdir-names' in variables.keys():
             subdir_names=variables.get('flux.hdfs.subdir-names',None)
+
+        if 'flux.sftp.hostname' in variables.keys():
+            ip_adress=variables.get('flux.sftp.hostname',None)
             
 
         if 'flux.sftp.port' in variables.keys():
@@ -212,7 +216,7 @@ def get_values_variables(data):
         if 'flux.name' in variables.keys():
             flux_name=variables.get('flux.name',None)
 
-    return staging,rep_raw,subdir_names,port,flux_name
+    return staging,rep_raw,subdir_names,port,flux_name,ip_adress
 
 
 
@@ -291,7 +295,7 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
                     variables=extract_variables(result,'variables')
                     #print("variables type",variables)
                     
-                    staging,rep_raw,subdir_names,port,flux_name=get_values_variables(variables)
+                    staging,rep_raw,subdir_names,port,flux_name,ip_adress=get_values_variables(variables)
                     #print("serveur",staging,"raw",rep_raw,"subdir",subdir_names,"port",port,"flux_name",flux_name)
                     
                 if 'processors' in result.keys():
@@ -320,7 +324,7 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
                 #print("nb_enabled",nb_enabled,"nb_disabled",nb_disabled)
                     
                     #print("nb_disabled",nb_disabled,"nb_processors",nb_processors)
-                    dc_info_process_group[i]={'groupIdentifier':groupIdentifier,'nb_processors':nb_processors,"nb_disabled":nb_disabled,"staging":staging,"rep_raw":rep_raw,"subdir":subdir_names,"port":port,"flux_name":flux_name}
+                    dc_info_process_group[i]={'groupIdentifier':groupIdentifier,'nb_processors':nb_processors,"nb_disabled":nb_disabled,"staging":staging,"rep_raw":rep_raw,"subdir":subdir_names,"port":port,"flux_name":flux_name,"ip_adress":ip_adress}
     
     else:
         print(f"Aucun dictionnaire ne contient la clé '{search_key}' avec la valeur '{search_value}'.")
@@ -333,6 +337,119 @@ search_key = "componentType"
 search_value = "PROCESS_GROUP"
 
 dic_process_group=create_scheduled_group_dict(data_dict,search_key,search_value)
+
+
+def update_dict_depedencies(dic:dict,dic_dependencies:dict):
+
+    for table,vaue in dic_dependencies.items():
+        depencies=vaue.get('dependencies')
+        if depencies:
+            raw=depencies[-1]
+            if raw:
+                if raw.startswith("/"):
+                    servers=[]
+                    for i in dic:
+                        rep_raw=i.get('raw_path')
+                        if rep_raw==raw:
+                            #print("server",i.get('server'),"flux_name",i.get('flux_name'),"raw",raw)
+                            server=i.get('server')
+                            if server and server not in depencies:
+                                servers.append(server)
+                                dic_dependencies[table]['server'] = servers
+    return dic_dependencies
+
+
+
+def structure_dic(dic_process_group: dict, dic_dependencies: dict):
+    """
+    Constructs a list of dictionaries where each record contains:
+    - 'id': A unique identifier for each entry
+    - 'server': The associated staging server
+    - 'nb_processors': Total number of processors
+    - 'nb_disabled_processors': Total number of disabled processors
+    - 'flux_name': The associated flux name (one per record)
+
+    Args:
+        dic_process_group (dict): Process group data with keys 'rep_raw', 'staging', 'subdir'.
+        dic_dependencies (dict): Dependency information of data warehouse tables.
+
+    Returns:
+        list: A structured list of dictionaries representing staging servers, their fluxes, and processing data.
+    """
+
+    structured_data = []
+    record_id = 1  # Unique identifier counter
+
+    for _, value in dic_dependencies.items():
+        dependencies = value.get('dependencies', [])
+        if not dependencies:
+            continue  # Skip if no dependencies
+
+        last_dependency = dependencies[-1]  # Get the last dependency (potential raw path)
+        if last_dependency and last_dependency.startswith("/"):
+            raw_path = last_dependency  # Detected raw directory
+
+            # Extract the first 4 parts of the path to get the base raw directory
+            tab_raw = raw_path.split("/")
+            second_to_last=None
+            if len(tab_raw) > 3:
+                raw_base_path = "/".join(tab_raw[:4])  # Example: "/PROD/RAW/OM"
+
+                for _, elements in dic_process_group.items():
+                    rep_raw = elements.get('rep_raw')
+                    staging_server = elements.get('staging')
+                    subdir = elements.get('subdir')
+                    ip_adress=elements.get('ip_adress')
+                    if subdir:
+                        tab_subdir= subdir.split(";")
+                    flux_name = elements.get('flux_name')  # Now ensures only ONE flux per entry
+                    group_identifier = elements.get('groupIdentifier')
+                    nb_processors = elements.get('nb_processors', 0)
+                    nb_disabled_processors = elements.get('nb_disabled', 0)
+
+                    if staging_server is None or flux_name is None:
+                        continue  # Skip if no staging server or flux name
+
+                    # Check if the raw path matches the process group's raw path
+                    if rep_raw and rep_raw == raw_base_path:
+                        second_to_last = tab_raw[-2]  # Example: "TRANSACTIONS" from "/PROD/RAW/OM/TRANSACTIONS"
+
+                        # on verifie que le sous repertoire est bien le meme que le sous repertoire du process group
+                        if tab_subdir:
+                            if subdir!=None and second_to_last==tab_subdir[0] or second_to_last in tab_subdir:
+                                structured_data.append({
+                                    "id": record_id,
+                                    "server": staging_server,
+                                    "nb_processors": nb_processors,
+                                    "nb_disabled_processors": nb_disabled_processors,
+                                    "flux_name": flux_name,
+                                    "raw_path": raw_path,
+                                    "ip_adress":ip_adress
+                                })
+                                record_id += 1
+
+                    # Case where the raw path is not fully detailed in the raw of the proces group ex: PROD/RAW
+                    else :
+                            if subdir!=None:
+                                second_to_last = tab_raw[-2]
+                                if second_to_last!=None:
+                                    if second_to_last in tab_subdir or second_to_last == tab_subdir[0]:
+                                        #print("subdir",subdir,"second_to_last",second_to_last,"rep_raw",rep_raw)
+                                        staging_server = elements.get('staging')
+                                        flux_name = elements.get('flux_name')
+                                        if second_to_last==tab_subdir[0] or second_to_last == tab_subdir:
+                                            structured_data.append({
+                                                "id": record_id,
+                                                "server": staging_server,
+                                                "nb_processors": nb_processors,
+                                                "nb_disabled_processors": nb_disabled_processors,
+                                                "flux_name": flux_name,
+                                                "raw_path": raw_path,
+                                                "ip_adress":ip_adress
+                                            })
+                                            record_id += 1
+
+    return structured_data
 #create_excel_from_dict(dic_process_group, output_file=r"C:\Users\YBQB7360\Documents\Data gouvernance\process_group.xlsx")
 
 #for i,value in dic_process_group.items():

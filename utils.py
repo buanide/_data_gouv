@@ -475,7 +475,7 @@ def extract_tables_from_hql(dic_name_table_hql_path:dict) -> dict:
 
 
 
-def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict, output_file:str) -> None:
+def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict, output_file:str) -> dict:
     """
     Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
     Args:
@@ -499,7 +499,7 @@ def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict,
             # Cycle détecté, ajouter le chemin avec une indication
             #unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
             return
-
+        
         # Ajouter la table courante au chemin
         current_path = current_path + [table]
 
@@ -547,22 +547,208 @@ def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict,
     for row in range(0,len(rows)):
         dic_dependences[rows[row][0]]={'dependencies':rows[row]}
     
+    
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns-2)]
+
+    # Créer un DataFrame avec les données collectées
+    df = pd.DataFrame(rows, columns=columns)
+
+    #df_unique=df.drop_duplicates()
+    #print("taille",len(df_unique))
+
+    # Exporter le DataFrame vers un fichier Excel
+    #df_unique.to_excel(output_file, index=False)
+    #print(f"Fichier Excel généré avec succès : {output_file}")
+    
+
+    return dic_dependences
+
+
+
+def generate_excel_with_dependencies_3(results:dict, dependency_map:dict,server_list: list, output_file:str) -> dict:
     """
-    #max_columns = max(len(row) for row in rows)
+    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
+    Args:
+        results (dict): Dictionnaire contenant les associations RDMS et Hive.
+        dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.     
+        output_file (str): Chemin du fichier Excel de sortie.
+    """
+    # Liste pour stocker les chemins uniques de dépendances
+    unique_paths = set()
+
+    def get_all_dependencies(table, current_path, visited):
+        """
+        Explore toutes les dépendances d'une table en profondeur et ajoute chaque chemin unique.
+
+        Args:
+            table (str): La table pour laquelle les dépendances doivent être explorées.
+            current_path (list): Le chemin courant (accumulé).
+            visited (set): Ensemble des tables déjà visitées pour éviter les cycles.
+        """
+        if table in visited:
+            # Cycle détecté, ajouter le chemin avec une indication
+            #unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
+            return
+        
+        # Ajouter la table courante au chemin
+        current_path = current_path + [table]
+
+        # Si la table n'a pas de dépendances, ajouter le chemin complet
+        if table not in dependency_map or not dependency_map[table].get('dependances', []):
+            unique_paths.add(tuple(current_path))
+            return
+
+        # Marquer la table comme visitée
+        visited.add(table)
+
+        # Parcourir les dépendances et continuer l'exploration
+        for dependency in dependency_map[table]['dependances']:
+            get_all_dependencies(dependency, current_path, visited.copy())
+
+    # Traitement des associations RDMS -> Hive et dépendances Hive
+    for file_path, table_info in results.items():
+        tables_rdms = table_info.get("table_data_rdms", [])
+        tables_hive = table_info.get("table_data_hive", [])
+        for rdms_table in tables_rdms:
+            for hive_table in tables_hive:
+                # Ajouter la relation RDMS -> Hive comme point de départ
+                unique_paths.add((rdms_table, hive_table))
+
+                # Ajouter les dépendances Hive pour cette table Hive
+                if hive_table in dependency_map:
+                    get_all_dependencies(hive_table, [rdms_table], set())
+
+    # Convertir les chemins uniques en lignes pour le DataFrame
+    rows = [list(path) for path in unique_paths]
+
+    # ajout des chemins raw
+    for row in rows:
+        raw_value = None
+        for key, value in dependency_map.items():
+            if value.get('cdr_name') == row[-1]:
+                raw_value = value.get('raw_directory')
+                if raw_value:
+                    raw_value=raw_value.split(" ")[0]
+                    for server in server_list:
+                        if server.get("raw_path") == raw_value:
+                            #print("server",server,"raw_value",raw_value)
+                            list_servers=server.get("server") 
+                            if list_servers:
+                                for i in range(0,len(list_servers)):
+                                    row.append(list_servers[i])
+
+
+        row.append(raw_value)
+    
+    #dic_dependences={}
+    max_columns = max(len(row) for row in rows)
     columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns-2)]
 
     # Créer un DataFrame avec les données collectées
     df = pd.DataFrame(rows, columns=columns)
 
     df_unique=df.drop_duplicates()
+    #print("taille",len(df_unique))
 
     # Exporter le DataFrame vers un fichier Excel
     df_unique.to_excel(output_file, index=False)
-    print(f"Fichier Excel généré avec succès : {output_file}")
+    #print(f"Fichier Excel généré avec succès : {output_file}")
+    
+
+    #return dic_dependences
+
+   
+    
+def generate_excel_with_dependencies_2(results: dict, dependency_map: dict, server_list: list, output_file: str) -> None:
     """
+    Generates an Excel file with the relationships between RDMS and Hive tables along with their dependencies.
+    The server is placed in the next available column after the last dependency.
 
-    return dic_dependences
+    Args:
+        results (dict): Dictionary containing RDMS and Hive table associations.
+        dependency_map (dict): Dictionary of dependencies {table_hive: {'dependencies': [...], 'cdr_name': ..., 'raw_directory': ...}}.
+        server_list (list): List of dictionaries containing server information.
+        output_file (str): Path to the output Excel file.
+    """
+    unique_paths = set()
 
+    def get_all_dependencies(table, current_path, visited):
+        """
+        Recursively explores all dependencies of a table and adds each unique path.
+
+        Args:
+            table (str): The table for which dependencies are being explored.
+            current_path (list): The accumulated dependency path.
+            visited (set): Set of tables already visited to prevent cycles.
+        """
+        if table in visited:
+            return
+
+        current_path = current_path + [table]
+
+        if table not in dependency_map or not dependency_map[table].get('dependencies', []):
+            unique_paths.add(tuple(current_path))
+            return
+
+        visited.add(table)
+
+        for dependency in dependency_map[table]['dependencies']:
+            get_all_dependencies(dependency, current_path, visited.copy())
+
+    # Process RDMS -> Hive table associations
+    for file_path, table_info in results.items():
+        tables_rdms = table_info.get("table_data_rdms", [])
+        tables_hive = table_info.get("table_data_hive", [])
+        for rdms_table in tables_rdms:
+            for hive_table in tables_hive:
+                unique_paths.add((rdms_table, hive_table))
+
+                if hive_table in dependency_map:
+                    get_all_dependencies(hive_table, [rdms_table], set())
+
+    # Convert unique paths into list format
+    rows = [list(path) for path in unique_paths]
+
+    print("nblignes",len(rows))
+    
+    """
+    # Add Raw Path and Server dynamically
+    for row in rows:
+        raw_value = None
+        server_value = None
+        flux_name = None
+
+        for key, value in dependency_map.items():
+            if value.get('cdr_name') == row[-1]:
+                raw_value = value.get('raw_directory')
+
+                # Find the matching server based on raw path
+                matching_servers = [server for server in server_list if server.get("raw_path") == raw_value]
+
+                if matching_servers:
+                    server_value = matching_servers[0]["server"]
+                    #nb_processors = matching_servers[0]["nb_processors"]
+                    #nb_disabled_processors = matching_servers[0]["nb_disabled_processors"]
+                    flux_name = matching_servers[0]["flux_name"]
+                    #ip_address = matching_servers[0]["ip_adress"]
+
+        row.append(raw_value)
+        row.append(server_value)
+        #row.append(nb_processors)
+        #row.append(nb_disabled_processors)
+        row.append(flux_name)
+        #row.append(ip_address)
+
+    # Determine the number of maximum columns
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns - 2)] 
+
+    # Create DataFrame and save to Excel
+    df = pd.DataFrame(rows, columns=columns)
+
+    df.to_excel(output_file, index=False)
+    """
 
 
 
