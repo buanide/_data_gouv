@@ -566,97 +566,117 @@ def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict,
 
 
 
-def generate_excel_with_dependencies_3(results:dict, dependency_map:dict,server_list: list, output_file:str) -> dict:
-    """
-    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
-    Args:
-        results (dict): Dictionnaire contenant les associations RDMS et Hive.
-        dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.     
-        output_file (str): Chemin du fichier Excel de sortie.
-    """
-    # Liste pour stocker les chemins uniques de dépendances
+
+def generate_excel_with_dependencies_3(results: dict, dependency_map: dict, server_list: list, output_file: str, table_names: list):
     unique_paths = set()
 
     def get_all_dependencies(table, current_path, visited):
-        """
-        Explore toutes les dépendances d'une table en profondeur et ajoute chaque chemin unique.
-
-        Args:
-            table (str): La table pour laquelle les dépendances doivent être explorées.
-            current_path (list): Le chemin courant (accumulé).
-            visited (set): Ensemble des tables déjà visitées pour éviter les cycles.
-        """
         if table in visited:
-            # Cycle détecté, ajouter le chemin avec une indication
-            #unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
             return
-        
-        # Ajouter la table courante au chemin
         current_path = current_path + [table]
-
-        # Si la table n'a pas de dépendances, ajouter le chemin complet
         if table not in dependency_map or not dependency_map[table].get('dependances', []):
             unique_paths.add(tuple(current_path))
             return
-
-        # Marquer la table comme visitée
         visited.add(table)
-
-        # Parcourir les dépendances et continuer l'exploration
         for dependency in dependency_map[table]['dependances']:
             get_all_dependencies(dependency, current_path, visited.copy())
 
-    # Traitement des associations RDMS -> Hive et dépendances Hive
     for file_path, table_info in results.items():
         tables_rdms = table_info.get("table_data_rdms", [])
         tables_hive = table_info.get("table_data_hive", [])
         for rdms_table in tables_rdms:
             for hive_table in tables_hive:
-                # Ajouter la relation RDMS -> Hive comme point de départ
                 unique_paths.add((rdms_table, hive_table))
-
-                # Ajouter les dépendances Hive pour cette table Hive
                 if hive_table in dependency_map:
                     get_all_dependencies(hive_table, [rdms_table], set())
 
-    # Convertir les chemins uniques en lignes pour le DataFrame
     rows = [list(path) for path in unique_paths]
 
-    # ajout des chemins raw
+    # Lists to store servers, raw paths, and flux names
+    servers_list = []
+    raw_paths_list = []
+    flux_names_list = []
+    nb_processors=[]
+    nb_disabled_processors=[]
+    hostnames=[]
+
+    final_rows = []  # To store the final rows
+
     for row in rows:
-        raw_value = None
-        for key, value in dependency_map.items():
-            if value.get('cdr_name') == row[-1]:
-                raw_value = value.get('raw_directory')
-                if raw_value:
-                    raw_value=raw_value.split(" ")[0]
-                    for server in server_list:
-                        if server.get("raw_path") == raw_value:
-                            #print("server",server,"raw_value",raw_value)
-                            list_servers=server.get("server") 
-                            if list_servers:
-                                for i in range(0,len(list_servers)):
-                                    row.append(list_servers[i])
+        if row[0] in table_names:
+            raw_value = None
+            server_list_for_row = []
+            flux_name = None
+            disabled_processors=None
+            processors=None
+            host_name=None
+
+            for key, value in dependency_map.items():
+                if value.get('cdr_name') == row[-1]:
+                    raw_value = value.get('raw_directory')
+                    if raw_value:
+                        raw_value = raw_value.split(" ")[0]
+                        for server in server_list:
+                            if server.get("raw_path") == raw_value:
+                                rep_server = server.get("server")
+                                flux_name = server.get("flux_name")
+                                processors=server.get("nb_processors")
+                                disabled_processors=server.get("nb_disabled_processors")
+                                host_name=server.get('ip_adress')
+
+                                if isinstance(rep_server, str):
+                                    server_list_for_row.append((rep_server, flux_name))
+                                elif isinstance(rep_server, list):
+                                    for s in rep_server:
+                                        server_list_for_row.append((s, flux_name))
+
+            if server_list_for_row:
+                for server_name, flux in server_list_for_row:
+                    new_row = row.copy()  # Duplicate the original row
+                    final_rows.append(new_row)
+                    servers_list.append(server_name)  # Store server
+                    raw_paths_list.append(raw_value)  # Store raw path
+                    flux_names_list.append(flux)      # Store flux name
+                    nb_processors.append(processors)
+                    nb_disabled_processors.append(disabled_processors)
+                    hostnames.append(host_name)
+
+            else:
+                final_rows.append(row)
+                servers_list.append(None)
+                raw_paths_list.append(raw_value)
+                flux_names_list.append(flux_name)
+                nb_processors.append(processors)
+                nb_disabled_processors.append(disabled_processors)
+                hostnames.append(host_name)
+               
 
 
-        row.append(raw_value)
+    # Fix for Uneven Rows
+    max_columns = max(len(row) for row in final_rows)
     
-    #dic_dependences={}
-    max_columns = max(len(row) for row in rows)
-    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns-2)]
 
-    # Créer un DataFrame avec les données collectées
-    df = pd.DataFrame(rows, columns=columns)
+    # Dynamic Column Names
+    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns - 2)]
 
-    df_unique=df.drop_duplicates()
-    #print("taille",len(df_unique))
+    df = pd.DataFrame(final_rows, columns=columns)
 
-    # Exporter le DataFrame vers un fichier Excel
+    # Adding new columns
+    df['Server'] = servers_list
+    df['Raw_Path'] = raw_paths_list
+    df['Flux_Name'] = flux_names_list
+    df['Nb_processor']=nb_processors
+    df['Nb_disabled_processors']=nb_disabled_processors
+    df['Hostname']=hostnames
+
+    df_unique = df.drop_duplicates()
+
+    # Export to Excel
     df_unique.to_excel(output_file, index=False)
-    #print(f"Fichier Excel généré avec succès : {output_file}")
-    
+    print(f"Excel file generated successfully at {output_file}")
 
-    #return dic_dependences
+
+
 
    
     
@@ -962,6 +982,7 @@ def display_table_dependencies_2(dependency_map: dict, table_name: str) -> None:
     output_file = f"{table_name}_dependencies.xlsx"
     df.to_excel(output_file, index=False)
     print(f"Les dépendances de la table '{table_name}' ont été exportées vers : {output_file}")
+
 
 
 

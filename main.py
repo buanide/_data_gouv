@@ -16,7 +16,7 @@ from format_json import read_json
 from format_json import update_dict_depedencies
 
 from format_json import structure_dic
-import pandas as pd
+
 
 import os
 
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     hql_path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\FT\IN_ZTE\prequery_spark_completude.hql"
     paths_scripts=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS'
     file_scripts_paths=list_all_files(paths_scripts)
-    nifi_flow_file=r"C:\Users\YBQB7360\Documents\fichier_formate.json" #exemple de fichier nifi json
+    nifi_flow_file=r"C:\Users\YBQB7360\Documents\Data gouvernance\ocm_data_gouv\formated_PRODv2.0.json" #exemple de fichier nifi json
     dic_nifi_flow_file = read_json(nifi_flow_file)
 
     dic_files_queries_paths = process_conf_files(directory_conf,root_dir)
@@ -69,7 +69,37 @@ if __name__ == "__main__":
          #   print("server",server)    
     #dic_rdms_paths_hive=extract_hive_table_and_queries_paths(directory_conf)
     #dic_rdms_fil_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
-    generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, "dependencies_with_raw_server.xlsx")
+    filter_list=tables = [
+        "MON.FT_GLOBAL_ACTIVITY_DAILY",
+        "DIM.DT_DATES",
+        "DIM.DT_OFFER_PROFILES",
+        "DIM.DT_DESTINATIONS",
+        "DIM.DT_VAT_RATE",
+        "MON.FT_A_GPRS_ACTIVITY",
+        "VW_DT_CI_INFO",
+        "FT_A_SUBSCRIBER_SUMMARY_B2B",
+        "MON.FT_A_GPRS_LOCATION",
+        "MON.SQ_FT_GOS_SVA",
+        "MON.FT_A_VAS_REVENUE_DAILY",
+        "DIM.DT_VAS_PARTNER",
+        "MON.FT_A_SUBSCRIBER_SUMMARY",
+        "MON.VW_DT_OFFER_PROFILES",
+        "MON.FT_A_SUBSCRIPTION",
+        "MON.FT_X_INTERCO_FINAL",
+        "DT_SMS_APPLICATION_ACC_REF",
+        "MON.FT_QOS_SMSC_SPECIAL_NUMBER",
+        "DIM.DT_TIME_SLICES",
+        "DIM.DT_USAGES",
+        "MON.FT_GSM_TRAFFIC_REVENUE_DAILY",
+        "MON.FT_A_DATA_TRANSFER",
+        "MON.FT_GROSS_ADD_COMPETITIORS",
+        "MON.FT_COMMERCIAL_SUBSCRIB_SUMMARY",
+        "DT_DATES",
+        "MON.VW_DT_DATES",
+        "MON.FT_GLOBAL_ACTIVITY_DAILY_MKT"
+    ]
+    name_file="dependencies_with_raw_server.xlsx"
+    generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,filter_list)
 
 
   

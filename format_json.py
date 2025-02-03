@@ -216,6 +216,8 @@ def get_values_variables(data):
         if 'flux.name' in variables.keys():
             flux_name=variables.get('flux.name',None)
 
+       
+
     return staging,rep_raw,subdir_names,port,flux_name,ip_adress
 
 
@@ -410,6 +412,9 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                     if staging_server is None or flux_name is None:
                         continue  # Skip if no staging server or flux name
 
+                    if nb_processors == 0:
+                        continue  # Avoid division by zero
+
                     # Check if the raw path matches the process group's raw path
                     if rep_raw and rep_raw == raw_base_path:
                         second_to_last = tab_raw[-2]  # Example: "TRANSACTIONS" from "/PROD/RAW/OM/TRANSACTIONS"
@@ -417,16 +422,17 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                         # on verifie que le sous repertoire est bien le meme que le sous repertoire du process group
                         if tab_subdir:
                             if subdir!=None and second_to_last==tab_subdir[0] or second_to_last in tab_subdir:
-                                structured_data.append({
-                                    "id": record_id,
-                                    "server": staging_server,
-                                    "nb_processors": nb_processors,
-                                    "nb_disabled_processors": nb_disabled_processors,
-                                    "flux_name": flux_name,
-                                    "raw_path": raw_path,
-                                    "ip_adress":ip_adress
-                                })
-                                record_id += 1
+                                if (nb_disabled_processors/nb_processors)<0.7:
+                                    structured_data.append({
+                                        "id": record_id,
+                                        "server": staging_server,
+                                        "nb_processors": nb_processors,
+                                        "nb_disabled_processors": nb_disabled_processors,
+                                        "flux_name": flux_name,
+                                        "raw_path": raw_path,
+                                        "ip_adress":ip_adress
+                                    })
+                                    record_id += 1
 
                     # Case where the raw path is not fully detailed in the raw of the proces group ex: PROD/RAW
                     else :
@@ -438,16 +444,17 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                         staging_server = elements.get('staging')
                                         flux_name = elements.get('flux_name')
                                         if second_to_last==tab_subdir[0] or second_to_last == tab_subdir:
-                                            structured_data.append({
-                                                "id": record_id,
-                                                "server": staging_server,
-                                                "nb_processors": nb_processors,
-                                                "nb_disabled_processors": nb_disabled_processors,
-                                                "flux_name": flux_name,
-                                                "raw_path": raw_path,
-                                                "ip_adress":ip_adress
-                                            })
-                                            record_id += 1
+                                            if (nb_disabled_processors/nb_processors)<0.7:
+                                                structured_data.append({
+                                                    "id": record_id,
+                                                    "server": staging_server,
+                                                    "nb_processors": nb_processors,
+                                                    "nb_disabled_processors": nb_disabled_processors,
+                                                    "flux_name": flux_name,
+                                                    "raw_path": raw_path,
+                                                    "ip_adress":ip_adress
+                                                })
+                                                record_id += 1
 
     return structured_data
 #create_excel_from_dict(dic_process_group, output_file=r"C:\Users\YBQB7360\Documents\Data gouvernance\process_group.xlsx")
@@ -462,3 +469,4 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
 #schema = generate_json_schema(data_dict)
 #print(schema)
 
+#to_format(r'C:\Users\YBQB7360\Documents\Data gouvernance\ocm_data_gouv\PRODv2.0.json',r'C:\Users\YBQB7360\Documents\Data gouvernance\ocm_data_gouv\formated_PRODv2.0')
