@@ -534,13 +534,20 @@ def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict,
     # ajout des chemins raw
     for row in rows:
         raw_value = None
+        #if "CDR.TT_SMSC_MVAS_A2P" in row:
+            #print(row[-1])
+        
         for key, value in dependency_map.items():
+
+           
+           
             if value.get('cdr_name') == row[-1]:
                 raw_value = value.get('raw_directory')
                 #print('raw_value',raw_value)
                 
         row.append(raw_value)
     
+    #print("a2p",a2p)
     dic_dependences={}
     # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
 
@@ -599,7 +606,8 @@ def generate_excel_with_dependencies_3(results: dict, dependency_map: dict, serv
     nb_processors=[]
     nb_disabled_processors=[]
     hostnames=[]
-
+    port_list=[]
+    username_list=[]
     final_rows = []  # To store the final rows
 
     for row in rows:
@@ -610,6 +618,8 @@ def generate_excel_with_dependencies_3(results: dict, dependency_map: dict, serv
             disabled_processors=None
             processors=None
             host_name=None
+            port=None
+            username=None
 
             for key, value in dependency_map.items():
                 if value.get('cdr_name') == row[-1]:
@@ -623,6 +633,8 @@ def generate_excel_with_dependencies_3(results: dict, dependency_map: dict, serv
                                 processors=server.get("nb_processors")
                                 disabled_processors=server.get("nb_disabled_processors")
                                 host_name=server.get('ip_adress')
+                                username=server.get("username")
+                                port=server.get("port")
 
                                 if isinstance(rep_server, str):
                                     server_list_for_row.append((rep_server, flux_name))
@@ -630,6 +642,7 @@ def generate_excel_with_dependencies_3(results: dict, dependency_map: dict, serv
                                     for s in rep_server:
                                         server_list_for_row.append((s, flux_name))
 
+            # si c'est une liste de server
             if server_list_for_row:
                 for server_name, flux in server_list_for_row:
                     new_row = row.copy()  # Duplicate the original row
@@ -640,6 +653,8 @@ def generate_excel_with_dependencies_3(results: dict, dependency_map: dict, serv
                     nb_processors.append(processors)
                     nb_disabled_processors.append(disabled_processors)
                     hostnames.append(host_name)
+                    port_list.append(port)
+                    username_list.append(username)
 
             else:
                 final_rows.append(row)
@@ -649,6 +664,8 @@ def generate_excel_with_dependencies_3(results: dict, dependency_map: dict, serv
                 nb_processors.append(processors)
                 nb_disabled_processors.append(disabled_processors)
                 hostnames.append(host_name)
+                port_list.append(port)
+                username_list.append(username)
                
 
 
@@ -668,6 +685,8 @@ def generate_excel_with_dependencies_3(results: dict, dependency_map: dict, serv
     df['Nb_processor']=nb_processors
     df['Nb_disabled_processors']=nb_disabled_processors
     df['Hostname']=hostnames
+    df['Port']=port_list
+    df['username']=username_list
 
     df_unique = df.drop_duplicates()
 

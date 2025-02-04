@@ -190,6 +190,7 @@ def get_values_variables(data):
     port=None
     flux_name=None
     ip_adress=None
+    username=None
     for idx, variables in enumerate(data, start=1):
         #print(f"Clé 'variables' #{idx}:")
         if 'flux.sftp.remote-path' in variables.keys():
@@ -209,18 +210,18 @@ def get_values_variables(data):
         if 'flux.sftp.hostname' in variables.keys():
             ip_adress=variables.get('flux.sftp.hostname',None)
             
-
         if 'flux.sftp.port' in variables.keys():
             port=variables.get('flux.sftp.port',None)
 
         if 'flux.name' in variables.keys():
             flux_name=variables.get('flux.name',None)
 
+        if 'flux.sftp.username' in variables.keys():
+            username=variables.get('flux.sftp.username',None)
+
        
 
-    return staging,rep_raw,subdir_names,port,flux_name,ip_adress
-
-
+    return staging,rep_raw,subdir_names,port,flux_name,ip_adress,username
 
 
 def create_dic_identifier(data_dict:dict,key:str):
@@ -297,7 +298,7 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
                     variables=extract_variables(result,'variables')
                     #print("variables type",variables)
                     
-                    staging,rep_raw,subdir_names,port,flux_name,ip_adress=get_values_variables(variables)
+                    staging,rep_raw,subdir_names,port,flux_name,ip_adress,username=get_values_variables(variables)
                     #print("serveur",staging,"raw",rep_raw,"subdir",subdir_names,"port",port,"flux_name",flux_name)
                     
                 if 'processors' in result.keys():
@@ -326,7 +327,7 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
                 #print("nb_enabled",nb_enabled,"nb_disabled",nb_disabled)
                     
                     #print("nb_disabled",nb_disabled,"nb_processors",nb_processors)
-                    dc_info_process_group[i]={'groupIdentifier':groupIdentifier,'nb_processors':nb_processors,"nb_disabled":nb_disabled,"staging":staging,"rep_raw":rep_raw,"subdir":subdir_names,"port":port,"flux_name":flux_name,"ip_adress":ip_adress}
+                    dc_info_process_group[i]={'groupIdentifier':groupIdentifier,'nb_processors':nb_processors,"nb_disabled":nb_disabled,"staging":staging,"rep_raw":rep_raw,"subdir":subdir_names,"port":port,"flux_name":flux_name,"ip_adress":ip_adress,"username":username}
     
     else:
         print(f"Aucun dictionnaire ne contient la clé '{search_key}' avec la valeur '{search_value}'.")
@@ -338,7 +339,7 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
 search_key = "componentType"
 search_value = "PROCESS_GROUP"
 
-dic_process_group=create_scheduled_group_dict(data_dict,search_key,search_value)
+#dic_process_group=create_scheduled_group_dict(data_dict,search_key,search_value)
 
 
 def update_dict_depedencies(dic:dict,dic_dependencies:dict):
@@ -382,8 +383,11 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
     structured_data = []
     record_id = 1  # Unique identifier counter
 
-    for _, value in dic_dependencies.items():
+    for i, value in dic_dependencies.items():
         dependencies = value.get('dependencies', [])
+        #print("table",i,"dependecies",dependencies)
+
+        
         if not dependencies:
             continue  # Skip if no dependencies
 
@@ -405,6 +409,8 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                     if subdir:
                         tab_subdir= subdir.split(";")
                     flux_name = elements.get('flux_name')  # Now ensures only ONE flux per entry
+                    username=elements.get('username')
+                    port=elements.get('port')
                     group_identifier = elements.get('groupIdentifier')
                     nb_processors = elements.get('nb_processors', 0)
                     nb_disabled_processors = elements.get('nb_disabled', 0)
@@ -422,6 +428,8 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                         # on verifie que le sous repertoire est bien le meme que le sous repertoire du process group
                         if tab_subdir:
                             if subdir!=None and second_to_last==tab_subdir[0] or second_to_last in tab_subdir:
+                                #if raw_path=='/PROD/RAW/MVAS/MVAS_DATA/merged_*':
+                                   # print('nb_processors',nb_processors,'nb_disabled_processors',nb_disabled_processors)
                                 if (nb_disabled_processors/nb_processors)<0.7:
                                     structured_data.append({
                                         "id": record_id,
@@ -430,7 +438,10 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                         "nb_disabled_processors": nb_disabled_processors,
                                         "flux_name": flux_name,
                                         "raw_path": raw_path,
-                                        "ip_adress":ip_adress
+                                        "ip_adress":ip_adress,
+                                        "username":username,
+                                        "port":port
+
                                     })
                                     record_id += 1
 
@@ -440,6 +451,8 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                 second_to_last = tab_raw[-2]
                                 if second_to_last!=None:
                                     if second_to_last in tab_subdir or second_to_last == tab_subdir[0]:
+                                        #if raw_path=='/PROD/RAW/MVAS/MVAS_DATA/merged_*':
+                                           # print('nb_processors',nb_processors,'nb_disabled_processors',nb_disabled_processors)
                                         #print("subdir",subdir,"second_to_last",second_to_last,"rep_raw",rep_raw)
                                         staging_server = elements.get('staging')
                                         flux_name = elements.get('flux_name')
@@ -452,7 +465,9 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                                     "nb_disabled_processors": nb_disabled_processors,
                                                     "flux_name": flux_name,
                                                     "raw_path": raw_path,
-                                                    "ip_adress":ip_adress
+                                                    "ip_adress":ip_adress,
+                                                    "username":username,
+                                                    "port":port
                                                 })
                                                 record_id += 1
 

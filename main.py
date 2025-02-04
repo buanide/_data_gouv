@@ -36,16 +36,24 @@ if __name__ == "__main__":
     hql_path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\FT\IN_ZTE\prequery_spark_completude.hql"
     paths_scripts=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS'
     file_scripts_paths=list_all_files(paths_scripts)
-    nifi_flow_file=r"C:\Users\YBQB7360\Documents\Data gouvernance\ocm_data_gouv\formated_PRODv2.0.json" #exemple de fichier nifi json
+    nifi_flow_file=r"C:\Users\YBQB7360\Documents\formated_PRODv2.0.json" #exemple de fichier nifi json
     dic_nifi_flow_file = read_json(nifi_flow_file)
 
     dic_files_queries_paths = process_conf_files(directory_conf,root_dir)
     # dic table hive -> dependances
     dic_tables_dependances=get_dir_dependances_2(dic_files_queries_paths)
+
+
+    #for i,value in dic_tables_dependances.items():
+     #   print("i",i,"value",value)
+
     #table datawarehouse ->equivalent datalake
     dic_rdms_hive=extract_hive_table_and_queries(directory_conf)
     #display_table_dependencies_2(dic_tables_dependances,"AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY")
     dic_dependencies=generate_excel_with_rdms_and_dependencies(dic_rdms_hive,dic_tables_dependances, "dependencies_with_raw.xlsx")
+    #print("equal","MON.FT_QOS_SMSC_SPECIAL_NUMBER" in dic_dependencies.keys())
+    
+    
     #print("unique_raw",unique_raw)
     server=None
     raw=None
@@ -55,8 +63,7 @@ if __name__ == "__main__":
     #18313f9f-beec-18e7-84b5-451d52b6e6e0 
     list_dic=structure_dic(dic_process_group,dic_dependencies)
 
-    #for i,value in dic_dependencies.items():
-    #    print("table",i,"dependences",value)
+    
     #updated_dict=update_dict_depedencies(dic,dic_dependencies)
     #for i,value in updated_dict.items():
         #print("key",i,"tables",value)
@@ -98,8 +105,8 @@ if __name__ == "__main__":
         "MON.VW_DT_DATES",
         "MON.FT_GLOBAL_ACTIVITY_DAILY_MKT"
     ]
-    name_file="dependencies_with_raw_server.xlsx"
-    generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,filter_list)
+    #name_file="dependencies_with_raw_server.xlsx"
+    #generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,filter_list)
 
 
   
