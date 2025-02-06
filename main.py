@@ -14,10 +14,8 @@ from utils import extract_hive_table_and_queries_paths
 from format_json import create_scheduled_group_dict
 from format_json import read_json
 from format_json import update_dict_depedencies
-
+from format_json import structure_dic_test
 from format_json import structure_dic
-
-
 import os
 
 #a,b=extract_data_sources(r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\FT\IN_ZTE\EQUATION_PREPAYEE\compute_and_insert_into_spark_ft_prpd_eqt.hql")
@@ -62,15 +60,12 @@ if __name__ == "__main__":
     dic_process_group=create_scheduled_group_dict(dic_nifi_flow_file,search_key,search_value)
     #18313f9f-beec-18e7-84b5-451d52b6e6e0 
     list_dic=structure_dic(dic_process_group,dic_dependencies)
-
-    
     #updated_dict=update_dict_depedencies(dic,dic_dependencies)
     #for i,value in updated_dict.items():
         #print("key",i,"tables",value)
 
     #for i,value in dic.items():
      #   print("raw:",value.get('raw'),"server:",i,"flux_name:",value.get('flux_name'),"group identifier",value.get('group_Identifier'),"nb_processors",value.get('nb_processors'),"nb_processors_disabled",value.get('nb_processors_disabeled'))
-    
         #if last.startswith("/"):
         #    server=last
          #   print("server",server)    
@@ -105,8 +100,8 @@ if __name__ == "__main__":
         "MON.VW_DT_DATES",
         "MON.FT_GLOBAL_ACTIVITY_DAILY_MKT"
     ]
-    #name_file="dependencies_with_raw_server.xlsx"
-    #generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,filter_list)
+    name_file="dependencies_with_raw_server.xlsx"
+    generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,filter_list)
 
 
   

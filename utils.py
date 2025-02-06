@@ -552,7 +552,8 @@ def generate_excel_with_rdms_and_dependencies(results:dict, dependency_map:dict,
     # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
 
     for row in range(0,len(rows)):
-        dic_dependences[rows[row][0]]={'dependencies':rows[row]}
+        #print("row:",rows[row])
+        dic_dependences[row]={'dependencies':rows[row]}
     
     
     max_columns = max(len(row) for row in rows)

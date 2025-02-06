@@ -394,13 +394,16 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
         last_dependency = dependencies[-1]  # Get the last dependency (potential raw path)
         if last_dependency and last_dependency.startswith("/"):
             raw_path = last_dependency  # Detected raw directory
-
             # Extract the first 4 parts of the path to get the base raw directory
             tab_raw = raw_path.split("/")
             second_to_last=None
             if len(tab_raw) > 3:
-                raw_base_path = "/".join(tab_raw[:4])  # Example: "/PROD/RAW/OM"
-
+                  # Example: "/PROD/RAW/OM"
+                #raw_base_path = "/".join(tab_raw[:4]).strip()
+                raw_base_path = "/".join(tab_raw[:4]).strip().replace("\u200b", "").replace("\xa0", "").replace("\n", "").replace("\r", "")
+                #print("raw_base_path",raw_base_path,"type",type(raw_base_path))
+                #print(f"Checking raw_base_path: {repr(raw_base_path)}")
+                #if "/PROD/RAW/MVAS"==raw_base_path:
                 for _, elements in dic_process_group.items():
                     rep_raw = elements.get('rep_raw')
                     staging_server = elements.get('staging')
@@ -414,6 +417,7 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                     group_identifier = elements.get('groupIdentifier')
                     nb_processors = elements.get('nb_processors', 0)
                     nb_disabled_processors = elements.get('nb_disabled', 0)
+                    
 
                     if staging_server is None or flux_name is None:
                         continue  # Skip if no staging server or flux name
@@ -424,13 +428,17 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                     # Check if the raw path matches the process group's raw path
                     if rep_raw and rep_raw == raw_base_path:
                         second_to_last = tab_raw[-2]  # Example: "TRANSACTIONS" from "/PROD/RAW/OM/TRANSACTIONS"
+                        #print("second_to_last", repr(second_to_last))
+                        #print("subdir", repr(tab_subdir))
 
                         # on verifie que le sous repertoire est bien le meme que le sous repertoire du process group
                         if tab_subdir:
                             if subdir!=None and second_to_last==tab_subdir[0] or second_to_last in tab_subdir:
+                                #print("MVAS_DATA in process_group")
                                 #if raw_path=='/PROD/RAW/MVAS/MVAS_DATA/merged_*':
-                                   # print('nb_processors',nb_processors,'nb_disabled_processors',nb_disabled_processors)
-                                if (nb_disabled_processors/nb_processors)<0.7:
+                                #print('nb_processors',nb_processors,'nb_disabled_processors',nb_disabled_processors)
+                                if (nb_disabled_processors/nb_processors)<0.8:
+                                    #print("serveur",staging_server,"raw",raw_path,"hostname",ip_adress,"port",port,"flux_name",flux_name)
                                     structured_data.append({
                                         "id": record_id,
                                         "server": staging_server,
@@ -452,12 +460,12 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                 if second_to_last!=None:
                                     if second_to_last in tab_subdir or second_to_last == tab_subdir[0]:
                                         #if raw_path=='/PROD/RAW/MVAS/MVAS_DATA/merged_*':
-                                           # print('nb_processors',nb_processors,'nb_disabled_processors',nb_disabled_processors)
+                                        # print('nb_processors',nb_processors,'nb_disabled_processors',nb_disabled_processors)
                                         #print("subdir",subdir,"second_to_last",second_to_last,"rep_raw",rep_raw)
                                         staging_server = elements.get('staging')
                                         flux_name = elements.get('flux_name')
                                         if second_to_last==tab_subdir[0] or second_to_last == tab_subdir:
-                                            if (nb_disabled_processors/nb_processors)<0.7:
+                                            if (nb_disabled_processors/nb_processors)<0.8:
                                                 structured_data.append({
                                                     "id": record_id,
                                                     "server": staging_server,
@@ -472,6 +480,93 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                                 record_id += 1
 
     return structured_data
+
+
+
+def structure_dic_test(dic_process_group: dict, dic_dependencies: dict):
+    structured_data = []
+    record_id = 1
+    encountered_paths = set()
+
+    # Debugging: Check for None values in dependencies
+    for key, v in dic_dependencies.items():
+        if v.get('dependencies'):
+            last_dep = v['dependencies'][-1]
+            if last_dep is None:
+                print(f"❌ Found None in dependencies for key: {key}")
+                if key=="MON.FT_QOS_SMSC_SPECIAL_NUMBER":
+                    print("MON.FT_QOS_SMSC_SPECIAL_NUMBER dep:",v['dependencies'])
+
+    # Ensure we only process valid dependencies
+    all_raw_paths = {v['dependencies'][-1].strip() for v in dic_dependencies.values() if v.get('dependencies') and v['dependencies'][-1] is not None}
+
+    if "/PROD/RAW/MVAS" in all_raw_paths:
+        print("/PROD/RAW/MVAS exists in `dic_dependencies!")
+    else:
+        print("/PROD/RAW/MVAS` is NOT in `dic_dependencies`! Check input data.")
+
+    for i, value in dic_dependencies.items():
+        dependencies = value.get('dependencies', [])
+        if not dependencies or dependencies[-1] is None:
+            continue
+
+        last_dependency = dependencies[-1].strip()
+        tab_raw = last_dependency.split("/")
+        second_to_last = None
+
+        if len(tab_raw) > 3:
+            raw_base_path = "/".join(tab_raw[:4]).strip().lower()
+            if raw_base_path not in encountered_paths:
+                print(f"Found raw_base_path: {repr(raw_base_path)}")
+                encountered_paths.add(raw_base_path)
+
+            if raw_base_path == "/prod/raw/mvas":
+                print("✅ Matched `/PROD/RAW/MVAS`!")
+
+                for _, elements in dic_process_group.items():
+                    rep_raw = elements.get('rep_raw')
+                    staging_server = elements.get('staging')
+                    subdir = elements.get('subdir')
+                    ip_adress = elements.get('ip_adress')
+                    username = elements.get('username')
+                    port = elements.get('port')
+                    nb_processors = elements.get('nb_processors', 0)
+                    nb_disabled_processors = elements.get('nb_disabled', 0)
+                    flux_name = elements.get('flux_name')
+
+                    tab_subdir = subdir.split(";") if subdir else []
+
+                    if staging_server is None or flux_name is None:
+                        continue
+
+                    if nb_processors == 0:
+                        continue
+
+                    if rep_raw and rep_raw.strip().lower() == raw_base_path:
+                        second_to_last = tab_raw[-2]
+                        print(f"Second_to_last: {repr(second_to_last)}")
+                        print(f"Subdir: {repr(tab_subdir)}")
+
+                        if second_to_last in tab_subdir or (subdir and second_to_last == tab_subdir[0]):
+                            print(f"✅ Matched subdir for {second_to_last}!")
+                            if (nb_disabled_processors / nb_processors) < 0.7:
+                                structured_data.append({
+                                    "id": record_id,
+                                    "server": staging_server,
+                                    "nb_processors": nb_processors,
+                                    "nb_disabled_processors": nb_disabled_processors,
+                                    "flux_name": flux_name,
+                                    "raw_path": last_dependency,
+                                    "ip_adress": ip_adress,
+                                    "username": username,
+                                    "port": port
+                                })
+                                record_id += 1
+
+    print(f"All encountered raw_base_paths: {encountered_paths}")
+    return structured_data
+
+
 #create_excel_from_dict(dic_process_group, output_file=r"C:\Users\YBQB7360\Documents\Data gouvernance\process_group.xlsx")
 
 #for i,value in dic_process_group.items():
