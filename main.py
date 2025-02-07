@@ -101,7 +101,7 @@ if __name__ == "__main__":
         "MON.FT_GLOBAL_ACTIVITY_DAILY_MKT"
     ]
     name_file="dependencies_with_raw_server.xlsx"
-    generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,filter_list)
+    #generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,filter_list)
 
 
   

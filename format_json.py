@@ -247,8 +247,8 @@ def create_dic_identifier(data_dict:dict,key:str):
 
 
 
-key="processGroups"
-dic_identifier=create_dic_identifier(data_dict,key)
+#key="processGroups"
+#dic_identifier=create_dic_identifier(data_dict,key)
 #for i,value in dic_identifier.items():
 #    print("id",i,"name",value)
 
@@ -278,12 +278,14 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
         dic_process_group={}
         dc_info_process_group={}
         dic_status={}
+        dic_processors={}
        
         if results:
             for i, result in enumerate(results, start=1):
                 #print(f"Dictionnaire #{i} contenant la clé '{search_key}' avec la valeur '{search_value}':")
                 nb_processors=0
                 groupIdentifier=None
+                name=None
                 if 'groupIdentifier' in result.keys():
                     groupIdentifier=result.get('groupIdentifier',None)
                     #print("groupIdentifier",groupIdentifier)
@@ -305,19 +307,36 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
                     processors=result.get('processors',None)
                     nb_processors+=len(processors)
                     list_scheduled_states=[]
+                    list_processors_names=[]
                     pos=0
+                    nb_list_disabled=0
                     for p in processors:
                         if pos==0:
                             if 'identifier'in p.keys():
                                 identifier=p.get('identifier',None)
                                 #dic_process_group[identifier]=[]
+
+                            if 'name' in p.keys():
+                                name=p.get('name',None)
+
+                            
+                    
+
+
                         if 'scheduledState' in p.keys():
                             #print("status",)
                             scheduledState=p.get('scheduledState',None)
                             if scheduledState:
                                 list_scheduled_states.append(scheduledState)
+                                if name!=None and name=='List Files' and scheduledState=='DISABLED':
+                                    nb_list_disabled+=1
+                                    
+
+
+                        dic_processors[pos]={'processors':name}
                         pos+=1
-         # verifier les chiffres la prochaine fois
+
+                    
                     nb_enabled=list_scheduled_states.count('ENABLED')
                     nb_disabled=list_scheduled_states.count('DISABLED')
                                 #list_scheduled_states.append(scheduledState)
@@ -327,7 +346,7 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
                 #print("nb_enabled",nb_enabled,"nb_disabled",nb_disabled)
                     
                     #print("nb_disabled",nb_disabled,"nb_processors",nb_processors)
-                    dc_info_process_group[i]={'groupIdentifier':groupIdentifier,'nb_processors':nb_processors,"nb_disabled":nb_disabled,"staging":staging,"rep_raw":rep_raw,"subdir":subdir_names,"port":port,"flux_name":flux_name,"ip_adress":ip_adress,"username":username}
+                    dc_info_process_group[i]={'groupIdentifier':groupIdentifier,'nb_processors':nb_processors,"nb_disabled":nb_disabled,"staging":staging,"rep_raw":rep_raw,"subdir":subdir_names,"port":port,"flux_name":flux_name,"ip_adress":ip_adress,"username":username,"name":name,"nb_list_disabled":nb_list_disabled}
     
     else:
         print(f"Aucun dictionnaire ne contient la clé '{search_key}' avec la valeur '{search_value}'.")
@@ -336,8 +355,8 @@ def create_scheduled_group_dict(data_dict:dict,search_key:str,search_value:str):
     return dc_info_process_group
 
 
-search_key = "componentType"
-search_value = "PROCESS_GROUP"
+#search_key = "componentType"
+#search_value = "PROCESS_GROUP"
 
 #dic_process_group=create_scheduled_group_dict(data_dict,search_key,search_value)
 
@@ -417,6 +436,7 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                     group_identifier = elements.get('groupIdentifier')
                     nb_processors = elements.get('nb_processors', 0)
                     nb_disabled_processors = elements.get('nb_disabled', 0)
+                    nb_list_processors_disabled=elements.get('nb_list_disabled')
                     
 
                     if staging_server is None or flux_name is None:
@@ -437,8 +457,9 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                 #print("MVAS_DATA in process_group")
                                 #if raw_path=='/PROD/RAW/MVAS/MVAS_DATA/merged_*':
                                 #print('nb_processors',nb_processors,'nb_disabled_processors',nb_disabled_processors)
+                                print("serveur",staging_server,"raw",raw_path,"hostname",ip_adress,"port",port,"flux_name",flux_name,"processors_list_disabled",nb_list_processors_disabled)
                                 if (nb_disabled_processors/nb_processors)<0.8:
-                                    #print("serveur",staging_server,"raw",raw_path,"hostname",ip_adress,"port",port,"flux_name",flux_name)
+                                   
                                     structured_data.append({
                                         "id": record_id,
                                         "server": staging_server,
