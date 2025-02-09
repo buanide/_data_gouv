@@ -7,16 +7,16 @@ from sqlglot.lineage import lineage
 import re
 from sqlglot import exp
 from sqlglot.optimizer.qualify import qualify
-from utils import list_all_files
-from fields import process_hql_files
-from fields import extract_lineage_fields
-from fields import export_lineage_to_excel
-from fields import create_lineage_dic
-from fields import print_lineage_dict
-from utils import map_rdms_file_hql_file
-from utils import extract_hive_table_and_queries
+from data_lineage.utils import list_all_files
+from data_lineage.fields import process_hql_files
+from data_lineage.fields import extract_lineage_fields
+from data_lineage.fields import export_lineage_to_excel
+from data_lineage.fields import create_lineage_dic
+from data_lineage.fields import print_lineage_dict
+from data_lineage.utils import map_rdms_file_hql_file
+from data_lineage.utils import extract_hive_table_and_queries
 import os
-from utils import extract_exec_queries
+from data_lineage.utils import extract_exec_queries
 
 hql_content="""
 INSERT INTO AGG.FT_GLOBAL_ACTIVITY_DAILY PARTITION(TRANSACTION_DATE)

@@ -1,3 +1,15 @@
+Metadata-Version: 2.2
+Name: ocm-data-gouv
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: openpyxl>=3.1.5
+Requires-Dist: pandas>=2.2.3
+Requires-Dist: regex>=2024.11.6
+Requires-Dist: sqlglot>=26.4.1
+Requires-Dist: sqlparse>=0.5.3
+
 # DATA GOUVERANCE
 
 This archive aims to enable the extraction of metadata (table dependencies, field dependencies, field descriptions) from various data sources within the OCM ecosystem:
@@ -8,8 +20,8 @@ Field dependencies: field a = field c + field d => field a depends on c and d.
 The different Python files are:
 
 utils.py: contains various functions that allow extracting dependencies from the project containing the necessary code for calculating the tables of the data warehouse and data lake.
-fields.py: contains various functions to ensure fields lineage
-format_json: contains function to parse and structure metadatas from different data pipelines 
+
+tryout.py: allow to generate datawarehouse tables depedencies.
 
 Errors explanations: 
 
@@ -18,26 +30,12 @@ Errors explanations:
 - "Aucune table RDMS trouvées" :means that  "flux\.rdms\.pre-exec-queries\" was found in the sqoop***.conf file
 
 
-# HOW TO INSTALL THE LIBRARY
 
-1) Install uv :  
-- Installation on windows: irm https://astral.sh/uv/install.ps1 | iex
+# Install uv 
 
-2) Install the library with :
-
-- Locally:
-     git clone https://github.com/tonpseudo/ma_librairie.git (you can also download the code and realize the following steps)
-     uv venv
-     cd data_lineage
-     uv pip install -e .
+irm https://astral.sh/uv/install.ps1 | iex
 
 
-3) modify the main.py to use function of the package or create your own .py file to use the function you need
-
-You need elements for this code:
-
-- the hdfs directory
-- the nifi flow file
 
 
 

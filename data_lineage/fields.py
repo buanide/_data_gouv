@@ -1,14 +1,11 @@
-from utils import list_all_files
 import re
-import sqlparse
-from collections import defaultdict
 import sqlglot
 from sqlglot import exp
-from sqlglot import parse_one
 from sqlglot.optimizer.qualify import qualify
 from sqlglot.optimizer.scope import find_all_in_scope
 from sqlglot.optimizer.scope import build_scope
 import pandas as pd
+
 
 def extract_table_names(query):
     """
@@ -21,17 +18,16 @@ def extract_table_names(query):
     # 2) Le nom de la table (entre le deuxième pair de guillemets)
     # 3) L'alias (entre le troisième pair de guillemets), même si on ne l'utilise pas ci-dessous.
     pattern = r'FROM\s+"([^"]+)"\."([^"]+)"\s+AS\s+"([^"]+)"'
-    
+
     matches = re.findall(pattern, query, flags=re.IGNORECASE | re.DOTALL)
-    
+
     # Exemple de match : [('mon', 'spark_ft_contract_snapshot', 'spark_ft_contract_snapshot'), ...]
     # On reforme le nom de la table "mon.spark_ft_contract_snapshot"
     table_names = [f"{schema}.{table}" for schema, table, alias in matches]
 
-    table_names=set(table_names)
-    
-    return list(table_names)
+    table_names = set(table_names)
 
+    return list(table_names)
 
 
 def extract_lineage_fields(hive_sql):
@@ -42,19 +38,18 @@ def extract_lineage_fields(hive_sql):
     expression = sqlglot.parse_one(hive_sql, read="hive")
     expression_qualified = qualify(expression)
     root = build_scope(expression_qualified)
-    #print("root",root)
+    # print("root",root)
     dic = {}
-    
 
     for column in find_all_in_scope(root.expression, exp.Column):
-        #print(root.sources)
+        # print(root.sources)
         tables = extract_table_names(str(root.sources[column.table]))
-        #print(f"coloumn : {str(column).split('.')[1]} => source: {extract_table_names(str(root.sources[column.table]))}")
-        #print("")
+        # print(f"coloumn : {str(column).split('.')[1]} => source: {extract_table_names(str(root.sources[column.table]))}")
+        # print("")
         # Retirer les guillemets du champ
-        #print("expre",str(column))
-        a = str(column).split('.')[1].strip('"')
-        #print("champs",a)
+        # print("expre",str(column))
+        a = str(column).split(".")[1].strip('"')
+        # print("champs",a)
         for t in tables:
             # Si le nom de la table n'existe pas encore dans le dictionnaire,
             # on l'initialise à un set pour éviter les doublons.
@@ -77,51 +72,51 @@ def extract_table_details_with_partition_and_if_not_exists(file_path):
     sont renvoyés en majuscules. 'if_not_exists' reste un booléen.
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as file:
+        with open(file_path, "r", encoding="utf-8") as file:
             content = file.read()
-        
+
         # 1) CREATE TABLE IF NOT EXISTS ... PARTITIONED BY ...
         create_table_match = re.search(
             r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(\S+)\s*\((.*?)\)\s*(PARTITIONED\s+BY\s*\(.*?\))?\s*STORED\s+AS\s+\w+",
             content,
-            re.DOTALL | re.IGNORECASE
+            re.DOTALL | re.IGNORECASE,
         )
-        
+
         if not create_table_match:
             # 2) CREATE TABLE ... PARTITIONED BY ... (sans IF NOT EXISTS)
             create_table_match = re.search(
                 r"CREATE\s+TABLE\s+(\S+)\s*\((.*?)\)\s*(PARTITIONED\s+BY\s*\(.*?\))?\s*STORED\s+AS\s+\w+",
                 content,
-                re.DOTALL | re.IGNORECASE
+                re.DOTALL | re.IGNORECASE,
             )
-        
+
             # 3) CREATE EXTERNAL TABLE (IF NOT EXISTS) ... LOCATION ...
             if not create_table_match:
                 create_table_match = re.search(
                     r"CREATE\s+EXTERNAL\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)\s*\((.*?)\)\s*(COMMENT\s+'.*?')?\s*ROW\s+FORMAT\s+DELIMITED\s+FIELDS\s+TERMINATED\s+BY\s+'.*?'\s*LOCATION\s+'(.*?)'",
                     content,
-                    re.DOTALL | re.IGNORECASE
+                    re.DOTALL | re.IGNORECASE,
                 )
-                
+
                 if not create_table_match:
                     print("Aucune requête CREATE (EXTERNAL) TABLE trouvée.")
                     return None, [], None, False
-        
+
         # Déterminer si IF NOT EXISTS est présent dans le contenu (optionnel)
-        if_not_exists = ("IF NOT EXISTS" in content.upper())
-        
+        if_not_exists = "IF NOT EXISTS" in content.upper()
+
         # Nom de la table (group(1))
         table_name = create_table_match.group(1)
-        
+
         # Contenu entre parenthèses : colonnes (group(2))
         table_body = create_table_match.group(2)
-        
+
         # Extraire les champs
         field_names = re.findall(r"\b(\w+)\b\s+\w+", table_body)
-        
+
         # Par défaut, pas de partition
         partitioned_by = None
-        
+
         # Vérifier la présence de PARTITIONED BY dans la capture group(3)
         if len(create_table_match.groups()) >= 3:
             group3 = create_table_match.group(3)
@@ -142,17 +137,16 @@ def extract_table_details_with_partition_and_if_not_exists(file_path):
 
         # 4) if_not_exists reste un booléen, pas de conversion en majuscules
         return table_name, field_names, partitioned_by, if_not_exists
-    
+
     except FileNotFoundError:
         print(f"Le fichier {file_path} est introuvable.")
         return None, [], None, False
     except Exception as e:
         print(f"Erreur : {e}")
         return None, [], None, False
-    
 
 
-def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
+def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str:
     """
     dic_path(dict) 'dic_path' : dictionnaire des table->list champs pour la requête courante
     results(dict): dictionaire des provenant des requêtes create table, table->liste des champs
@@ -171,32 +165,32 @@ def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
     :return: ex: "mon.spark_ft_contract_snapshot.charge" si trouvé,
              ou la valeur d'origine si pas trouvé.
     """
-     # 1) Isoler le col_name (sans alias)
-    #print("column_name",column_name)
+    # 1) Isoler le col_name (sans alias)
+    # print("column_name",column_name)
     split_col = column_name.split(".")
-    #print("split_col:",split_col,"taille:",len(split_col))
+    # print("split_col:",split_col,"taille:",len(split_col))
     if len(split_col) == 2:
         # alias = 'a', col_name = 'CHARGE' (ex.)
         _, col_name = split_col
         return col_name
     elif len(split_col) == 3:
-         col_name=split_col[2]
-         return col_name
-         #print("col_name",col_name)
+        col_name = split_col[2]
+        return col_name
+        # print("col_name",col_name)
     else:
         # Pas de point => la colonne est directe
         # (ex. col_name = 'CHARGE')
-        #col_name=column_name
+        # col_name=column_name
         pass
 
     # 2) Convertir en majuscules pour la comparaison
-    
+
     for table_name, fields in dic_path.items():
         fields_upper = [f.upper() for f in fields]
         col_name = col_name.strip('`"').upper()
-        #print("col name",col_name)
+        # print("col name",col_name)
         if col_name in fields_upper:
-            #print('operator_code true')
+            # print('operator_code true')
             return f"{col_name}"
         else:
             col_name = col_name.strip('`"').upper()
@@ -206,15 +200,20 @@ def resolve_column_alias(column_name: str,dic_path:dict,results: dict) -> str:
                 fields = table_info.get("fields", [])
                 fields_upper = [f.upper() for f in fields]
                 if col_name in fields_upper:
-                    table_name = table_info.get("table_name", "").upper()  # on met le nom de table en maj
+                    table_name = table_info.get(
+                        "table_name", ""
+                    ).upper()  # on met le nom de table en maj
                     if table_name and table_name in dic_path:
-                        return f"{col_name}" 
+                        return f"{col_name}"
                     else:
-                        continue  
+                        continue
 
     return column_name
 
-def analyze_projection(projection: exp.Expression,hql_content:str,results: dict) -> dict:
+
+def analyze_projection(
+    projection: exp.Expression, hql_content: str, results: dict
+) -> dict:
     """
     Analyse une projection pour extraire :
       - columns_used : liste des colonnes (résolues si ambiguës) en minuscule
@@ -224,7 +223,6 @@ def analyze_projection(projection: exp.Expression,hql_content:str,results: dict)
     """
 
     columns_used = []
-    
 
     for col in projection.find_all(exp.Column):
         if col.db:
@@ -234,11 +232,11 @@ def analyze_projection(projection: exp.Expression,hql_content:str,results: dict)
 
         column_part = col.name
         raw_column_name = f"{table_part}.{column_part}" if table_part else column_part
-        #print("raw_column_name",raw_column_name)
-        dic_table_fields=extract_lineage_fields(hql_content)
-        #print("raw_column_name")
+        # print("raw_column_name",raw_column_name)
+        dic_table_fields = extract_lineage_fields(hql_content)
+        # print("raw_column_name")
         # Tenter de résoudre l'ambiguïté (ex. 'a.CHARGE' -> 'mon.spark_ft_contract_snapshot.charge')
-        resolved = resolve_column_alias(raw_column_name,dic_table_fields, results)
+        resolved = resolve_column_alias(raw_column_name, dic_table_fields, results)
         columns_used.append(resolved)
 
     # Fonctions d'agrégation
@@ -255,7 +253,6 @@ def analyze_projection(projection: exp.Expression,hql_content:str,results: dict)
     for node in projection.find_all(ARITHMETIC_NODES):
         arithmetic_ops.append(type(node).__name__.upper())
 
-   
     formula_sql = projection.sql(dialect="hive")
 
     return {
@@ -266,7 +263,6 @@ def analyze_projection(projection: exp.Expression,hql_content:str,results: dict)
     }
 
 
-
 def find_tables_in_select(select_expr: exp.Select) -> list:
     """
     Récupère toutes les tables mentionnées dans un SELECT donné
@@ -275,9 +271,9 @@ def find_tables_in_select(select_expr: exp.Select) -> list:
     """
     tables = []
     for table_expr in select_expr.find_all(exp.Table):
-        print("table_expr",table_expr)
+        print("table_expr", table_expr)
         if table_expr.db:
-            print("db",table_expr.db)
+            print("db", table_expr.db)
             tables.append(f"{table_expr.db}.{table_expr.name}")
         else:
             tables.append(table_expr.name)
@@ -285,19 +281,17 @@ def find_tables_in_select(select_expr: exp.Select) -> list:
 
 
 def get_col_name_without_table(col_name: str) -> str:
-    """
-    
-    """
+    """ """
     # 1) Remove outer quotes
-    col_no_quotes = col_name.replace('"', "")  
+    col_no_quotes = col_name.replace('"', "")
     # e.g. "ft_contract_snapshot"."operator_code" -> ft_contract_snapshot.operator_code
 
     # 2) Split on the first dot (if any)
-    parts = col_no_quotes.split(".", 1)  
+    parts = col_no_quotes.split(".", 1)
     # e.g. ["ft_contract_snapshot", "operator_code"]
-    #print("parts",parts)
-    
-    if len(parts)==2:
+    # print("parts",parts)
+
+    if len(parts) == 2:
         return parts[1]
 
     else:
@@ -326,7 +320,7 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
     lineage_dict = {}
 
     try:
-        with open(hql_file_path, 'r', encoding='utf-8') as f:
+        with open(hql_file_path, "r", encoding="utf-8") as f:
             hql_content = f.read()
     except FileNotFoundError:
         print(f"Fichier introuvable: {hql_file_path}")
@@ -338,39 +332,35 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
         return {}
 
     expression_qualified = qualify(expression)
-    root_scope = build_scope(expression_qualified)
     all_selects = list(expression_qualified.find_all(exp.Select))
     lineage_dict[hql_file_path] = {}
     for select_expr in all_selects:
         tables_in_select = find_tables_in_select(select_expr)
-        #print("tablein select",tables_in_select)
+        # print("tablein select",tables_in_select)
         tables_str = ", ".join(tables_in_select) if tables_in_select else "Aucune table"
         for proj in select_expr.selects:
             if isinstance(proj, exp.Alias):
                 alias_name = proj.alias or "NO_ALIAS"
                 expr_to_analyze = proj.this
-                #print("expr to analyze",expr_to_analyze)
-                #print(repr(proj))
-  
+                # print("expr to analyze",expr_to_analyze)
+                # print(repr(proj))
+
             else:
                 alias_name = proj.alias_or_name or "NO_ALIAS"
                 expr_to_analyze = proj
-            info = analyze_projection(expr_to_analyze,hql_content, results)
+            info = analyze_projection(expr_to_analyze, hql_content, results)
 
             lineage_dict[hql_file_path][alias_name] = {
                 "Alias/Projection": alias_name,
                 "Colonnes détectées": info["columns_used"],
-                #"Schema": schemas_par_col,
+                # "Schema": schemas_par_col,
                 "agg": info["aggregations"],
                 "Opérations arithmétiques": info["arithmetic_ops"],
                 "Formule SQL": info["formula_sql"],
-                "Table(s) utilisées": tables_str
+                "Table(s) utilisées": tables_str,
             }
 
     return lineage_dict
-
-
-
 
 
 def print_lineage_dict(lineage_dict: dict):
@@ -383,11 +373,12 @@ def print_lineage_dict(lineage_dict: dict):
             print(f"  - Alias/Projection : {alias_name}")
             print(f"    Colonnes détectées       : {details['Colonnes détectées']}")
             print(f"    Fonctions d'agg          : {details['agg']}")
-            print(f"    Opérations arithmétiques : {details['Opérations arithmétiques']}")
+            print(
+                f"    Opérations arithmétiques : {details['Opérations arithmétiques']}"
+            )
             print(f"    Formule SQL              : {details['Formule SQL']}")
             print(f"    Tables utilisées       : {details['Table(s) utilisées']}")
             print()
-
 
 
 def export_lineage_to_excel(lineage_dict: dict, output_excel_path: str):
@@ -404,25 +395,30 @@ def export_lineage_to_excel(lineage_dict: dict, output_excel_path: str):
             row = {
                 "Nom du Fichier": hql_path,
                 "Alias/Projection": alias_name,
-                "Schema":details.get("Schema", ""),
+                "Schema": details.get("Schema", ""),
                 "Colonnes détectées": ", ".join(details.get("Colonnes détectées", [])),
                 "agg": ", ".join(details.get("agg", [])),
-                "Opérations arithmétiques": ", ".join(details.get("Opérations arithmétiques", [])),
+                "Opérations arithmétiques": ", ".join(
+                    details.get("Opérations arithmétiques", [])
+                ),
                 "Formule SQL": details.get("Formule SQL", ""),
-                "Tables utilisées": details.get("Table(s) utilisées", "")
+                "Tables utilisées": details.get("Table(s) utilisées", ""),
             }
             excel_rows.append(row)
 
     # Créer un DataFrame pandas
-    df = pd.DataFrame(excel_rows, columns=[
-        "Nom du Fichier",
-        "Alias/Projection",
-        "Colonnes détectées",
-        "agg",
-        "Opérations arithmétiques",
-        "Formule SQL",
-        "Tables utilisées"
-    ])
+    df = pd.DataFrame(
+        excel_rows,
+        columns=[
+            "Nom du Fichier",
+            "Alias/Projection",
+            "Colonnes détectées",
+            "agg",
+            "Opérations arithmétiques",
+            "Formule SQL",
+            "Tables utilisées",
+        ],
+    )
     # Exporter le DataFrame vers Excel
     try:
         df.to_excel(output_excel_path, index=False)
@@ -430,11 +426,12 @@ def export_lineage_to_excel(lineage_dict: dict, output_excel_path: str):
     except Exception as e:
         print(f"Erreur lors de l'exportation vers Excel: {e}")
 
+
 def process_hql_files(file_paths):
     """
     Traite une liste de chemins de fichiers HQL pour extraire le nom de la table et ses champs,
     uniquement pour les fichiers dont le nom contient "create".
-    
+
     Args:
         file_paths (list): Liste des chemins de fichiers HQL.
 
@@ -448,42 +445,20 @@ def process_hql_files(file_paths):
         if file_path.endswith(".hql") and "create" in file_path.lower():
             try:
                 # Extraction du nom de la table et des champs
-                table_name, fields_list, partitioned_by, if_not_exists = extract_table_details_with_partition_and_if_not_exists(file_path)
+                table_name, fields_list, partitioned_by, if_not_exists = (
+                    extract_table_details_with_partition_and_if_not_exists(file_path)
+                )
                 results[file_path] = {
                     "table_name": table_name,
                     "fields": fields_list,
                     "partitioned_by": partitioned_by,
-                    "if_not_exists": if_not_exists
+                    "if_not_exists": if_not_exists,
                 }
             except ValueError as e:
                 print(f"Erreur lors du traitement du fichier {file_path}: {e}")
         else:
-            print(f"Le fichier {file_path} n'est pas un fichier HQL ou ne contient pas de requête CREATE TABLE.")
+            print(
+                f"Le fichier {file_path} n'est pas un fichier HQL ou ne contient pas de requête CREATE TABLE."
+            )
 
     return results
-
-
-def find_tables_in_select(select_expr: exp.Select) -> list:
-    """
-    Récupère toutes les tables mentionnées dans un SELECT donné
-    (dans le FROM, les JOIN, etc.).
-    Retourne une liste de noms de tables sous la forme SCHEMA.TABLE ou TABLE.
-    """
-    tables = []
-    for table_expr in select_expr.find_all(exp.Table):
-        # table_expr.db = schéma, table_expr.name = nom de la table
-        # Ex : db=MON, name=FT_CONTRACT_SNAPSHOT
-        if table_expr.db:
-            tables.append(f"{table_expr.db}.{table_expr.name}")
-        else:
-            tables.append(table_expr.name)
-    return list(set(tables))  # on retire les doublons
-
-
-
-
-
-
-
-
-    
