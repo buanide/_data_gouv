@@ -1,4 +1,4 @@
-# DATA GOUVERANCE
+# DATA GOVERNANCE
 
 This archive aims to enable the extraction of metadata (table dependencies, field dependencies, field descriptions) from various data sources within the OCM ecosystem:
 
