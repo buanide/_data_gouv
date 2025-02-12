@@ -211,9 +211,7 @@ def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str
     return column_name
 
 
-def analyze_projection(
-    projection: exp.Expression, hql_content: str, results: dict
-) -> dict:
+def analyze_projection(projection: exp.Expression, hql_content: str, results: dict) -> dict:
     """
     Analyse une projection pour extraire :
       - columns_used : liste des colonnes (résolues si ambiguës) en minuscule
@@ -373,9 +371,7 @@ def print_lineage_dict(lineage_dict: dict):
             print(f"  - Alias/Projection : {alias_name}")
             print(f"    Colonnes détectées       : {details['Colonnes détectées']}")
             print(f"    Fonctions d'agg          : {details['agg']}")
-            print(
-                f"    Opérations arithmétiques : {details['Opérations arithmétiques']}"
-            )
+            print(f"    Opérations arithmétiques : {details['Opérations arithmétiques']}")
             print(f"    Formule SQL              : {details['Formule SQL']}")
             print(f"    Tables utilisées       : {details['Table(s) utilisées']}")
             print()
@@ -398,9 +394,7 @@ def export_lineage_to_excel(lineage_dict: dict, output_excel_path: str):
                 "Schema": details.get("Schema", ""),
                 "Colonnes détectées": ", ".join(details.get("Colonnes détectées", [])),
                 "agg": ", ".join(details.get("agg", [])),
-                "Opérations arithmétiques": ", ".join(
-                    details.get("Opérations arithmétiques", [])
-                ),
+                "Opérations arithmétiques": ", ".join(details.get("Opérations arithmétiques", [])),
                 "Formule SQL": details.get("Formule SQL", ""),
                 "Tables utilisées": details.get("Table(s) utilisées", ""),
             }

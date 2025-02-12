@@ -19,9 +19,7 @@ def list_all_files(directory: str) -> list:
 # Specify the directory path you want to start from
 
 
-def extract_pre_exec_and_exec_queries_by_file(
-    file_paths: list, root_directory: str
-) -> dict:
+def extract_pre_exec_and_exec_queries_by_file(file_paths: list, root_directory: str) -> dict:
     """
     Associe chaque fichier à ses pré-queries en utilisant des chemins absolus.
 
@@ -168,9 +166,7 @@ def extract_hive_table_and_queries_paths(conf_dir: str) -> dict:
                     )
                     # tables_hive = extract_tables_from_queries(hive_match.group(0) if hive_match else "")
 
-                    results[tables_rdms[0]] = {
-                        "table_data_hive_path": hive_match.group(0)
-                    }
+                    results[tables_rdms[0]] = {"table_data_hive_path": hive_match.group(0)}
 
                     # Ajouter les tables aux ensembles globaux
                     # total_rdms_tables.update(tables_rdms)
@@ -273,9 +269,7 @@ def extract_exec_queries(file_path: str) -> tuple:
             content = file.read()
 
             # Expression régulière pour flux.pre-exec-queries
-            pre_exec_matches = re.findall(
-                r'flux\.pre-exec-queries\s*\+=\s*"([^"]+)"', content
-            )
+            pre_exec_matches = re.findall(r'flux\.pre-exec-queries\s*\+=\s*"([^"]+)"', content)
             if pre_exec_matches:
                 pre_exec_queries.extend(query.strip() for query in pre_exec_matches)
 
@@ -290,15 +284,11 @@ def extract_exec_queries(file_path: str) -> tuple:
             if src_temp_matches:
                 raw = src_temp_matches[0].strip()
 
-            dest_temp_matches = re.findall(
-                r'flux\.hdfs\.dest-temp-tt-dir\s*=\s*"([^"]+)"', content
-            )
+            dest_temp_matches = re.findall(r'flux\.hdfs\.dest-temp-tt-dir\s*=\s*"([^"]+)"', content)
             if dest_temp_matches:
                 tt = dest_temp_matches[0].strip()
 
-            cdr_matches = re.findall(
-                r'flux\.hive\.extra-conf\s*\+=\s*"([^"]+)"', content
-            )
+            cdr_matches = re.findall(r'flux\.hive\.extra-conf\s*\+=\s*"([^"]+)"', content)
             # print("cdr_matches",cdr_matches)
             if cdr_matches:
                 hive_var.extend(var.strip() for var in cdr_matches)
@@ -347,9 +337,7 @@ def process_conf_files(directory: str, hdfs_directory: str) -> dict:
                         # print("Chemin complet :", full_path)
                         paths_pre_exec_queries.append(full_path)
                     else:
-                        print(
-                            "ce n'est pas un chemin, fonction,process_conf_files", query
-                        )
+                        print("ce n'est pas un chemin, fonction,process_conf_files", query)
 
             if exec_queries:
                 for query in exec_queries:
@@ -363,9 +351,7 @@ def process_conf_files(directory: str, hdfs_directory: str) -> dict:
                         # print("Chemin complet :", full_path)
                         path_exec_queries.append(full_path)
                     else:
-                        print(
-                            "ce n'est pas un chemin, fonction,process_conf_files", query
-                        )
+                        print("ce n'est pas un chemin, fonction,process_conf_files", query)
 
             dic_conf_queries[path] = {
                 "pre_exec": paths_pre_exec_queries,
@@ -411,15 +397,11 @@ def map_rdms_file_hql_file(dic_rdms_hive: dict, list_paths_scripts_hql: list) ->
                 continue
 
             # Rechercher les tables dans les instructions INSERT INTO
-            insert_into_tables = re.findall(
-                insert_into_pattern, hql_content, re.IGNORECASE
-            )
+            insert_into_tables = re.findall(insert_into_pattern, hql_content, re.IGNORECASE)
 
             # Ajouter chaque table trouvée au dictionnaire
             for main_table in insert_into_tables:
-                main_table_upper = (
-                    main_table.upper()
-                )  # Uniformiser les noms de table en majuscules
+                main_table_upper = main_table.upper()  # Uniformiser les noms de table en majuscules
 
                 # Si la table existe déjà dans le dictionnaire, ajouter le chemin
                 if main_table_upper in dic:
@@ -553,9 +535,7 @@ def generate_excel_with_rdms_and_dependencies(
         current_path = current_path + [table]
 
         # Si la table n'a pas de dépendances, ajouter le chemin complet
-        if table not in dependency_map or not dependency_map[table].get(
-            "dependances", []
-        ):
+        if table not in dependency_map or not dependency_map[table].get("dependances", []):
             unique_paths.add(tuple(current_path))
             return
 
@@ -632,9 +612,7 @@ def generate_excel_with_dependencies_3(
         if table in visited:
             return
         current_path = current_path + [table]
-        if table not in dependency_map or not dependency_map[table].get(
-            "dependances", []
-        ):
+        if table not in dependency_map or not dependency_map[table].get("dependances", []):
             unique_paths.add(tuple(current_path))
             return
         visited.add(table)
@@ -684,9 +662,7 @@ def generate_excel_with_dependencies_3(
                                 rep_server = server.get("server")
                                 flux_name = server.get("flux_name")
                                 processors = server.get("nb_processors")
-                                disabled_processors = server.get(
-                                    "nb_disabled_processors"
-                                )
+                                disabled_processors = server.get("nb_disabled_processors")
                                 host_name = server.get("ip_adress")
                                 username = server.get("username")
                                 port = server.get("port")
@@ -778,9 +754,7 @@ def generate_excel_with_dependencies_2(
 
         current_path = current_path + [table]
 
-        if table not in dependency_map or not dependency_map[table].get(
-            "dependencies", []
-        ):
+        if table not in dependency_map or not dependency_map[table].get("dependencies", []):
             unique_paths.add(tuple(current_path))
             return
 
@@ -974,9 +948,7 @@ def display_table_dependencies(dependency_map: dict, table_name: str) -> None:
 
     # Déterminer le nombre maximum de colonnes pour formater correctement
     max_columns = max(len(row) for row in rows)
-    columns = ["Table_Principale"] + [
-        f"Dépendance{i + 1}" for i in range(max_columns - 1)
-    ]
+    columns = ["Table_Principale"] + [f"Dépendance{i + 1}" for i in range(max_columns - 1)]
 
     # Créer un DataFrame avec les données collectées
     df = pd.DataFrame(rows, columns=columns)
@@ -984,9 +956,7 @@ def display_table_dependencies(dependency_map: dict, table_name: str) -> None:
     # Exporter les données vers un fichier Excel
     output_file = f"{table_name}_dependencies.xlsx"
     df.to_excel(output_file, index=False)
-    print(
-        f"Les dépendances de la table '{table_name}' ont été exportées vers : {output_file}"
-    )
+    print(f"Les dépendances de la table '{table_name}' ont été exportées vers : {output_file}")
 
 
 def display_table_dependencies_2(dependency_map: dict, table_name: str) -> None:
@@ -1018,9 +988,7 @@ def display_table_dependencies_2(dependency_map: dict, table_name: str) -> None:
         current_path = current_path + [table]
 
         # Si la table n'a pas de dépendances, ajouter le chemin complet
-        if table not in dependency_map or not dependency_map[table].get(
-            "dependances", []
-        ):
+        if table not in dependency_map or not dependency_map[table].get("dependances", []):
             unique_paths.add(tuple(current_path))
             return
 
@@ -1062,9 +1030,7 @@ def display_table_dependencies_2(dependency_map: dict, table_name: str) -> None:
     # Exporter les données vers un fichier Excel
     output_file = f"{table_name}_dependencies.xlsx"
     df.to_excel(output_file, index=False)
-    print(
-        f"Les dépendances de la table '{table_name}' ont été exportées vers : {output_file}"
-    )
+    print(f"Les dépendances de la table '{table_name}' ont été exportées vers : {output_file}")
 
 
 def redirect_error(list_to_redirect):
@@ -1121,9 +1087,7 @@ def update_dependency_dict(existing_dict, dic_tables):
         if key:
             # Si la clé existe, étendre les dépendances
             if key in existing_dict:
-                existing_dict[key]["tables_dépendantes"].extend(
-                    value["tables_dépendantes"]
-                )
+                existing_dict[key]["tables_dépendantes"].extend(value["tables_dépendantes"])
                 # Éviter les doublons dans les dépendances
                 existing_dict[key]["tables_dépendantes"] = list(
                     set(existing_dict[key]["tables_dépendantes"])
@@ -1173,9 +1137,7 @@ def parse_hql_file(file_path):
         if tables:
             for table in tables:
                 # Extraire les colonnes et champs calculés
-                fields = re.findall(
-                    r"\b([\w\.]+)\s+AS\s+([\w]+)", statement, re.IGNORECASE
-                )
+                fields = re.findall(r"\b([\w\.]+)\s+AS\s+([\w]+)", statement, re.IGNORECASE)
                 calculated_fields = [(calc[1], calc[0]) for calc in fields]
 
                 # Ajouter les résultats

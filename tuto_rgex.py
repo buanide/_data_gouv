@@ -5,6 +5,8 @@ import re
 """
 ok pour : spark_compute_and_insert_adjustement_activity.hql
 """
+
+
 def find_alias_after_parentheses(hive_query):
     """
     Trouve les alias qui suivent un FROM ou JOIN avec une sous-requête en parenthèses,
@@ -21,7 +23,7 @@ def find_alias_after_parentheses(hive_query):
 
     # Expression régulière ajustée pour capturer les alias sans capturer 'AND'
     # Utilisation d'un lookahead négatif pour éviter la capture de 'AND' comme alias
-    pattern = r'(?:FROM|JOIN|LEFT\sJOIN)\s*\(([^()]*+(?:\([^()]*+\))*[^()]*+)\)\s+([A-Za-z_][A-Za-z0-9_]*)\b(?!\s*AND\b)'
+    pattern = r"(?:FROM|JOIN|LEFT\sJOIN)\s*\(([^()]*+(?:\([^()]*+\))*[^()]*+)\)\s+([A-Za-z_][A-Za-z0-9_]*)\b(?!\s*AND\b)"
 
     # Trouver toutes les correspondances
     matches = re.findall(pattern, hive_query)
@@ -62,7 +64,8 @@ def find_alias_after_parentheses(hive_query):
     alias_dict = {match[1].upper(): match[0] for match in matches}
     return alias_dict
 
-hql="""
+
+hql = """
 INSERT INTO AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY PARTITION(TRANSACTION_DATE)
 SELECT
     COMMERCIAL_OFFER_CODE
@@ -145,7 +148,7 @@ FROM(
 """
 
 # Affichage des dates trouvées
-cor=find_alias_after_parentheses(hql)
+cor = find_alias_after_parentheses(hql)
 
 
 print(cor)

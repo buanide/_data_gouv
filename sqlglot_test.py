@@ -7,7 +7,7 @@ from sqlglot.optimizer.scope import build_scope
 from data_lineage.fields import find_tables_in_select
 
 query = "SELECT * FROM ( Select a , b mon.spark_ft_contract_snapshot)"
-expression=sqlglot.parse_one(query, read="hive")
+expression = sqlglot.parse_one(query, read="hive")
 expression_qualified = qualify(expression)
 all_selects = list(expression_qualified.find_all(exp.Select))
 

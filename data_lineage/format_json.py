@@ -151,14 +151,11 @@ def extract_dict(data, search_key, search_value):
     Retourne tous les dictionnaires contenant une clé particulière avec une valeur spécifique
     """
     matching_dicts = []
-
     # Parcours récursif des données
     def recursive_search(obj):
         if isinstance(obj, dict):
             if search_key in obj and obj[search_key] == search_value:
-                matching_dicts.append(
-                    obj
-                )  # Ajouter le dictionnaire contenant la clé et la valeur
+                matching_dicts.append(obj)  # Ajouter le dictionnaire contenant la clé et la valeur
             for key, value in obj.items():
                 recursive_search(value)  # Explorer les sous-dictionnaires
         elif isinstance(obj, list):
@@ -179,9 +176,7 @@ def extract_dict_from_key(data, search_key):
     def recursive_search(obj):
         if isinstance(obj, dict):
             if search_key in obj:
-                matching_dicts.append(
-                    obj
-                )  # Ajouter le dictionnaire contenant la clé et la valeur
+                matching_dicts.append(obj)  # Ajouter le dictionnaire contenant la clé et la valeur
             for key, value in obj.items():
                 recursive_search(value)  # Explorer les sous-dictionnaires
         elif isinstance(obj, list):
@@ -208,10 +203,7 @@ def get_values_variables(data):
         elif "flux.stagging.final" in variables.keys():
             staging = variables.get("flux.stagging.final", None)
 
-        if (
-            "flux.hdfs.filedir" in variables.keys()
-            or "flux.hdfs.raw" in variables.keys()
-        ):
+        if "flux.hdfs.filedir" in variables.keys() or "flux.hdfs.raw" in variables.keys():
             rep_raw = variables.get("flux.hdfs.filedir", None)
             if rep_raw == None:
                 rep_raw = variables.get("flux.hdfs.raw", None)
@@ -306,16 +298,7 @@ def create_scheduled_group_dict(data_dict: dict, search_key: str, search_value: 
                     # print("componentType",componentType)
                     variables = extract_variables(result, "variables")
                     # print("variables type",variables)
-
-                    (
-                        staging,
-                        rep_raw,
-                        subdir_names,
-                        port,
-                        flux_name,
-                        ip_adress,
-                        username,
-                    ) = get_values_variables(variables)
+                    staging,rep_raw,subdir_names,port,flux_name,ip_adress,username,= get_values_variables(variables)
                     # print("serveur",staging,"raw",rep_raw,"subdir",subdir_names,"port",port,"flux_name",flux_name)
 
                 if "processors" in result.keys():
@@ -406,6 +389,37 @@ def update_dict_depedencies(dic: dict, dic_dependencies: dict):
                                 dic_dependencies[table]["server"] = servers
     return dic_dependencies
 
+# pas viable car élimine des enregistrement dans le tableau final avec les cdr
+def filter_best_records(data_list):
+    """
+    Filtre les dictionnaires en gardant uniquement ceux avec le moins de nb_list_disabled
+    pour chaque combinaison unique de raw_path et flux_name.
+
+    Args:
+        data_list (list): Liste de dictionnaires contenant les informations.
+
+    Returns:
+        list: Liste filtrée avec seulement les meilleurs enregistrements pour chaque combinaison (raw_path, flux_name).
+    """
+    # Dictionnaire pour stocker le meilleur enregistrement pour chaque combinaison (raw_path, flux_name)
+    best_records = {}
+
+    for record in data_list:
+        raw_path = record.get("raw_path")
+        flux_name = record.get("flux_name")
+        nb_list_disabled = record.get("nb_list_disabled")
+
+        # Créer une clé unique (raw_path, flux_name)
+        key = (raw_path, flux_name)
+
+        # Si la clé n'est pas encore dans le dictionnaire ou si ce record a un nb_list_disabled plus faible
+        if key not in best_records or nb_list_disabled < best_records[key].get("nb_list_disabled"):
+            best_records[key] = record
+
+    # Retourner la liste des meilleurs enregistrements
+    return list(best_records.values())
+
+
 
 def structure_dic(dic_process_group: dict, dic_dependencies: dict):
     """
@@ -434,9 +448,7 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
         if not dependencies:
             continue  # Skip if no dependencies
 
-        last_dependency = dependencies[
-            -1
-        ]  # Get the last dependency (potential raw path)
+        last_dependency = dependencies[-1]  # Get the last dependency (potential raw path)
         if last_dependency and last_dependency.startswith("/"):
             raw_path = last_dependency  # Detected raw directory
             # Extract the first 4 parts of the path to get the base raw directory
@@ -463,9 +475,7 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                     ip_adress = elements.get("ip_adress")
                     if subdir:
                         tab_subdir = subdir.split(";")
-                    flux_name = elements.get(
-                        "flux_name"
-                    )  # Now ensures only ONE flux per entry
+                    flux_name = elements.get("flux_name")  # Now ensures only ONE flux per entry
                     username = elements.get("username")
                     port = elements.get("port")
                     group_identifier = elements.get("groupIdentifier")
@@ -497,21 +507,17 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                 # print("MVAS_DATA in process_group")
                                 # if raw_path=='/PROD/RAW/MVAS/MVAS_DATA/merged_*':
                                 # print('nb_processors',nb_processors,'nb_disabled_processors',nb_disabled_processors)
-                                print(
-                                    "serveur",
-                                    staging_server,
-                                    "raw",
-                                    raw_path,
-                                    "hostname",
-                                    ip_adress,
-                                    "port",
-                                    port,
-                                    "flux_name",
+                                """
+                                print("serveur",staging_server,"raw",raw_path,"hostname",ip_adress,"port",port,
+"flux_name",
                                     flux_name,
                                     "processors_list_disabled",
                                     nb_list_processors_disabled,
                                 )
+                                """
                                 if (nb_disabled_processors / nb_processors) < 0.8:
+                                    
+
                                     structured_data.append(
                                         {
                                             "id": record_id,
@@ -523,6 +529,7 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                             "ip_adress": ip_adress,
                                             "username": username,
                                             "port": port,
+                                            "nb_list_disabled":nb_list_processors_disabled
                                         }
                                     )
                                     record_id += 1
@@ -532,10 +539,7 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                         if subdir != None:
                             second_to_last = tab_raw[-2]
                             if second_to_last != None:
-                                if (
-                                    second_to_last in tab_subdir
-                                    or second_to_last == tab_subdir[0]
-                                ):
+                                if second_to_last in tab_subdir or second_to_last == tab_subdir[0]:
                                     # if raw_path=='/PROD/RAW/MVAS/MVAS_DATA/merged_*':
                                     # print('nb_processors',nb_processors,'nb_disabled_processors',nb_disabled_processors)
                                     # print("subdir",subdir,"second_to_last",second_to_last,"rep_raw",rep_raw)
@@ -545,9 +549,7 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                         second_to_last == tab_subdir[0]
                                         or second_to_last == tab_subdir
                                     ):
-                                        if (
-                                            nb_disabled_processors / nb_processors
-                                        ) < 0.8:
+                                        if (nb_disabled_processors / nb_processors) < 0.8:
                                             structured_data.append(
                                                 {
                                                     "id": record_id,
@@ -559,9 +561,12 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                                     "ip_adress": ip_adress,
                                                     "username": username,
                                                     "port": port,
+                                                    "nb_list_disabled":nb_list_processors_disabled
                                                 }
                                             )
                                             record_id += 1
+
+    #structured_data=filter_best_records(structured_data)
 
     return structured_data
 
