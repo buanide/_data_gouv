@@ -504,7 +504,7 @@ def extract_tables_from_hql(dic_name_table_hql_path: dict) -> dict:
     return dic_load
 
 
-def generate_excel_with_rdms_and_dependencies(
+def generate_dic_with_rdms_and_dependencies(
     results: dict, dependency_map: dict, output_file: str
 ) -> dict:
     """
@@ -565,12 +565,14 @@ def generate_excel_with_rdms_and_dependencies(
     # ajout des chemins raw
     for row in rows:
         raw_value = None
+        tt_value=None
         # if "CDR.TT_SMSC_MVAS_A2P" in row:
         # print(row[-1])
 
         for key, value in dependency_map.items():
             if value.get("cdr_name") == row[-1]:
                 raw_value = value.get("raw_directory")
+                
                 # print('raw_value',raw_value)
 
         row.append(raw_value)
@@ -598,6 +600,110 @@ def generate_excel_with_rdms_and_dependencies(
 
     return dic_dependences
 
+
+def generate_excel_with_rdms_and_dependencies(
+    results: dict, dependency_map: dict, output_file: str
+) -> dict:
+    """
+    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
+    Args:
+        results (dict): Dictionnaire contenant les associations RDMS et Hive.
+        dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.
+        output_file (str): Chemin du fichier Excel de sortie.
+    """
+    # Liste pour stocker les chemins uniques de dépendances
+    unique_paths = set()
+
+    def get_all_dependencies(table, current_path, visited):
+        """
+        Explore toutes les dépendances d'une table en profondeur et ajoute chaque chemin unique.
+
+        Args:
+            table (str): La table pour laquelle les dépendances doivent être explorées.
+            current_path (list): Le chemin courant (accumulé).
+            visited (set): Ensemble des tables déjà visitées pour éviter les cycles.
+        """
+        if table in visited:
+            # Cycle détecté, ajouter le chemin avec une indication
+            # unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
+            return
+
+        # Ajouter la table courante au chemin
+        current_path = current_path + [table]
+
+        # Si la table n'a pas de dépendances, ajouter le chemin complet
+        if table not in dependency_map or not dependency_map[table].get("dependances", []):
+            unique_paths.add(tuple(current_path))
+            return
+
+        # Marquer la table comme visitée
+        visited.add(table)
+
+        # Parcourir les dépendances et continuer l'exploration
+        for dependency in dependency_map[table]["dependances"]:
+            get_all_dependencies(dependency, current_path, visited.copy())
+
+    # Traitement des associations RDMS -> Hive et dépendances Hive
+    for file_path, table_info in results.items():
+        tables_rdms = table_info.get("table_data_rdms", [])
+        tables_hive = table_info.get("table_data_hive", [])
+        for rdms_table in tables_rdms:
+            for hive_table in tables_hive:
+                # Ajouter la relation RDMS -> Hive comme point de départ
+                unique_paths.add((rdms_table, hive_table))
+
+                # Ajouter les dépendances Hive pour cette table Hive
+                if hive_table in dependency_map:
+                    get_all_dependencies(hive_table, [rdms_table], set())
+
+    # Convertir les chemins uniques en lignes pour le DataFrame
+    rows = [list(path) for path in unique_paths]
+
+    # ajout des chemins raw
+    final_rows = []
+    list_raws=[]
+    list_tt_value=[]
+    for row in rows:
+        raw_value = None
+        tt_value=None
+        for key, value in dependency_map.items():
+            if value.get("cdr_name") == row[-1]:
+                raw_value = value.get("raw_directory")
+                tt_value=value.get("tt_directory")
+        list_tt_value.append(tt_value)
+        list_raws.append(raw_value)
+                # print('raw_value',raw_value)
+        #row.append(raw_value)
+
+    # print("a2p",a2p)
+    dic_dependences = {}
+    # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
+
+    for row in range(0, len(rows)):
+        # print("row:",rows[row])
+        dic_dependences[row] = {"dependencies": rows[row]}
+
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns-2)]
+
+    # Créer un DataFrame avec les données collectées
+    df = pd.DataFrame(rows, columns=columns)
+
+    #REVOIR LES IT 
+    df["Raw_Path"]=list_raws
+    df['it']=list_tt_value
+    
+    df_unique=df.drop_duplicates()
+    #print("taille",len(df_unique))
+
+    print("nb unique raw",df["Raw_Path"].nunique())
+    print("nb unique tt",df["it"].nunique())
+
+    # Exporter le DataFrame vers un fichier Excel
+    #df_unique.to_excel(output_file, index=False)
+    # print(f"Fichier Excel généré avec succès : {output_file}")
+
+    
 
 def generate_excel_with_dependencies_3(
     results: dict,
@@ -862,6 +968,7 @@ def get_dir_dependances_2(dic_files_queries_paths: dict) -> dict:
         # Récupérer la valeur 'raw' pour le fichier actuel
         raw_path = queries.get("raw_directory", None)
         cdr_name = queries.get("cdr_tt", None)
+        tt_directory=queries.get('tt_directory',None)
 
         # Traiter les requêtes 'exec'
         if queries["exec"]:
@@ -873,6 +980,7 @@ def get_dir_dependances_2(dic_files_queries_paths: dict) -> dict:
                             "dependances": set(),
                             "raw_directory": raw_path,
                             "cdr_name": cdr_name,
+                            "tt_directory":tt_directory
                         }
                     dic[main_table]["dependances"].update(dependent_tables)
 
@@ -886,6 +994,7 @@ def get_dir_dependances_2(dic_files_queries_paths: dict) -> dict:
                             "dependances": set(),
                             "raw_directory": raw_path,
                             "cdr_name": cdr_name,
+                             "tt_directory":tt_directory
                         }
                     dic[main_table]["dependances"].update(dependent_tables)
 
@@ -966,6 +1075,9 @@ def display_table_dependencies_2(dependency_map: dict, table_name: str) -> None:
     Args:
         dependency_map (dict): Dictionnaire des dépendances {table_principale: {'dependances': [dépendances], 'raw': chemin_raw}}.
         table_name (str): Nom de la table pour laquelle afficher les dépendances.
+
+
+    exemple d'appel: display_table_dependencies_2(dic_tables_dependances,"AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY")
     """
     # Liste pour stocker les chemins uniques de dépendances
     unique_paths = set()
