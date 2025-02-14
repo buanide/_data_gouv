@@ -4,6 +4,7 @@ from data_lineage.utils import generate_excel_with_rdms_and_dependencies
 from data_lineage.utils import process_conf_files
 from data_lineage.utils import get_dir_dependances_2
 from data_lineage.utils import extract_hive_table_and_queries
+from data_lineage.clean import get_strange_conf
 
 hdfs_dir = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS"
 scripts_dir = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS"
@@ -43,9 +44,15 @@ filter_list = [
 
 #data_sources_lineage(hdfs_dir,scripts_dir,directory_conf,dic_nifi,filter_list,name_file)
 dic_files_queries_paths = process_conf_files(directory_conf, hdfs_dir)
+
+get_strange_conf(dic_files_queries_paths)
     # dic table hive -> dependances
-dic_tables_dependances = get_dir_dependances_2(dic_files_queries_paths)
+
+
+    
+
+#dic_tables_dependances = get_dir_dependances_2(dic_files_queries_paths)
     # table datawarehouse ->equivalent datalake
-dic_rdms_hive = extract_hive_table_and_queries(directory_conf)
-generate_excel_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependances, "dependencies_with_raw.xlsx")
+#dic_rdms_hive = extract_hive_table_and_queries(directory_conf)
+#generate_excel_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependances, "dependencies_with_raw.xlsx")
 
