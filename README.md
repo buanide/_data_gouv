@@ -32,7 +32,7 @@ Errors explanations:
      uv pip install -e .
 
 
-3) modify the main.py to use function of the package or create your own .py file to use the function you need
+3) modify the demo.py to use function of the package or create your own .py file to use the function that you need
 
 You need elements for this code:
 
