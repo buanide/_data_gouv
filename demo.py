@@ -44,13 +44,8 @@ filter_list = [
 
 #data_sources_lineage(hdfs_dir,scripts_dir,directory_conf,dic_nifi,filter_list,name_file)
 dic_files_queries_paths = process_conf_files(directory_conf, hdfs_dir)
-
-get_strange_conf(dic_files_queries_paths)
+#get_strange_conf(dic_files_queries_paths)
     # dic table hive -> dependances
-
-
-    
-
 #dic_tables_dependances = get_dir_dependances_2(dic_files_queries_paths)
     # table datawarehouse ->equivalent datalake
 #dic_rdms_hive = extract_hive_table_and_queries(directory_conf)

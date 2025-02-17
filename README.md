@@ -28,13 +28,13 @@ Errors explanations:
 - Locally:
      git clone https://github.com/tonpseudo/ma_librairie.git (you can also download the code and realize the following steps)
      uv venv
-     cd data_lineage
      uv pip install -e .
 
 
 3) modify the demo.py to use function of the package or create your own .py file to use the function that you need
 
-You need elements for this code:
+4) to runthe code use: uv run <nom_fichier.py>
+You need some elements for this code:
 
 - the hdfs directory
 - the nifi flow file

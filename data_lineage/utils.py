@@ -105,7 +105,7 @@ def extract_tables_from_queries(queries: str) -> list:
 
     return tables
 
-
+# post queries à rajouter dès que possible 
 def extract_hive_table_and_queries_paths(conf_dir: str) -> dict:
     """
     Permet d'extraire pour chaque fichier de configuration la table RDMS et Hive
@@ -185,7 +185,7 @@ def extract_hive_table_and_queries(conf_dir: str) -> dict:
         conf_dir (str): Chemin du répertoire contenant les fichiers de configuration.
 
     Returns:
-        dict: Dictionnaire contenant en clé sle nom de la table rdms et valeur le chemin de sa table hive
+        dict: Dictionnaire contenant en clé le nom de la table rdms et valeur le chemin de sa table hive
     """
     results = {}
     # total_rdms_tables = set()
@@ -505,14 +505,25 @@ def extract_tables_from_hql(dic_name_table_hql_path: dict) -> dict:
 
 
 def generate_dic_with_rdms_and_dependencies(
-    results: dict, dependency_map: dict, output_file: str
-) -> dict:
+    results: dict, dependency_map: dict) -> dict:
     """
-    Génère un fichier Excel avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
+    Génère un dictionnaire avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
     Args:
         results (dict): Dictionnaire contenant les associations RDMS et Hive.
         dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.
         output_file (str): Chemin du fichier Excel de sortie.
+
+    retourne un dictionnaire de le forme:
+     
+     {0->{
+     'dependencies': ['MON.SPARK_FT_BDI_SF', 'MON.SPARK_FT_BDI_SF', 
+     'TMP.TT_KYC_BDI_SF', 'TMP.TT_KYC_BDI3' ]},
+     
+      1->{'dependencies':[......]}
+
+      }
+
+    
     """
     # Liste pour stocker les chemins uniques de dépendances
     unique_paths = set()
@@ -579,24 +590,10 @@ def generate_dic_with_rdms_and_dependencies(
 
     # print("a2p",a2p)
     dic_dependences = {}
-    # Déterminer le nombre maximum de colonnes pour formater correctement le fichier Excel
 
-    for row in range(0, len(rows)):
+    for table_rdms in range(0, len(rows)):
         # print("row:",rows[row])
-        dic_dependences[row] = {"dependencies": rows[row]}
-
-    # max_columns = max(len(row) for row in rows)
-    # columns = ["Table_RDMS", "Table_Hive"] + [f"Dep_datalake{i+1}" for i in range(max_columns-2)]
-
-    # Créer un DataFrame avec les données collectées
-    # df = pd.DataFrame(rows, columns=columns)
-
-    # df_unique=df.drop_duplicates()
-    # print("taille",len(df_unique))
-
-    # Exporter le DataFrame vers un fichier Excel
-    # df_unique.to_excel(output_file, index=False)
-    # print(f"Fichier Excel généré avec succès : {output_file}")
+        dic_dependences[table_rdms] = {"dependencies": rows[table_rdms]}
 
     return dic_dependences
 

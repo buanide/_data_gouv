@@ -288,10 +288,8 @@ def get_col_name_without_table(col_name: str) -> str:
     parts = col_no_quotes.split(".", 1)
     # e.g. ["ft_contract_snapshot", "operator_code"]
     # print("parts",parts)
-
     if len(parts) == 2:
         return parts[1]
-
     else:
         return parts[0]
 
@@ -360,6 +358,48 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
 
     return lineage_dict
 
+def get_unique_tables_names_from_lineage_dict(lineage_dict:dict)->list:
+    """
+    Extrait les noms uniques des tables à partir d'un dictionnaire de lignage de données.
+    Args:
+        lineage_dict (dict): Dictionnaire contenant les informations de lignage des fichiers HQL.
+                             Il est structuré sous la forme :
+                             {
+                                 "chemin_du_fichier.hql": {
+                                     "alias_1": {"Table(s) utilisées": "nom_table"},
+                                     "alias_2": {"Table(s) utilisées": "autre_table"},
+                                     ...
+                                 },
+                                 ...
+                             }
+    Returns:
+        list
+    """
+    set_tables=set()
+    for hql_path, aliases_info in lineage_dict.items():
+        #print(f"\n=== FICHIER HQL : {hql_path} ===")
+        for alias_name, details in aliases_info.items():
+            table_name=details.get('Table(s) utilisées',None)
+            table_name=table_name.upper()
+            set_tables.add(table_name)
+    #set_tables.add(lineage_dict.get("Table(s) utilisées",None))
+        
+    return list(set_tables)
+
+def get_hql_path_from_table_name(dict_table_paths:dict,table_names:list)->dict:
+    list_paths=[]
+    dic_table_hql_paths={}
+    for i in table_names:
+        hql_path=dict_table_paths.get(i,None)
+        dic_table_hql_paths[i]={'list_hql':hql_path}
+    return dic_table_hql_paths
+
+def get_table_paths(list_tables,dic_rdms_hive,dic_hive_depencies):
+    """
+    génère un dictionnaire où pour chaque table contenu dans une 
+    ligne de dependances on a son où ses fichiers de création 
+    """
+    
 
 def print_lineage_dict(lineage_dict: dict):
     """
