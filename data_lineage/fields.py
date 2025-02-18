@@ -5,6 +5,8 @@ from sqlglot.optimizer.qualify import qualify
 from sqlglot.optimizer.scope import find_all_in_scope
 from sqlglot.optimizer.scope import build_scope
 import pandas as pd
+from collections import defaultdict
+import os
 
 
 def extract_table_names(query):
@@ -357,6 +359,144 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
             }
 
     return lineage_dict
+
+
+def create_dict_tables_dependencies_and_path(
+    dict_table_paths: dict,
+    dic_rdms_hive_dependencies: dict,
+    dict_rdms_fields: dict
+) -> dict:
+    """
+    Crée un dictionnaire des dépendances de tables RDMS et associe chaque dépendance à son fichier HQL.
+    
+    Args:
+        dict_table_paths (dict): Dictionnaire associant chaque table Hive à son fichier HQL.
+                                 Exemple: {"table_hive1": "chemin/vers/fichier1.hql", ...}
+        dic_rdms_hive_dependencies (dict): Dictionnaire des dépendances RDMS -> Hive.
+                                           Exemple: {"rdms_table": {"dependencies": ["hive_table1", "hive_table2"]}, ...}
+        dict_rdms_fields (dict): Dictionnaire associant une table RDMS à la liste de ses champs.
+                                 Exemple: {"rdms_table": ["champ1", "champ2", "champ3"], ...}
+    
+    Returns:
+        dict: Dictionnaire structuré sous la forme:
+              {
+                  "rdms_table1": {
+                      "liste_champs": ["champ1", "champ2"],
+                      "dependencies": {
+                          "hive_table1": "file1.hql",
+                          "hive_table2": "file2.hql"
+                      }
+                  },
+                  "rdms_table2": {
+                      "liste_champs": ["champA", "champB"],
+                      "dependencies": {
+                          "hive_table3": "file3.hql"
+                      }
+                  }
+              }
+    """
+    dict_tables_dependencies = {}
+    for rdms, value in dic_rdms_hive_dependencies.items():
+        dependencies = value.get('dependencies', [])
+        second_dependency=None
+         #on récupère la première dependance ton récupère ses champs
+        first_dependency=None
+        second_dependency=dependencies[1]
+        first_dependency=dependencies[0]
+        
+        fields=[]
+        for i,value in dict_rdms_fields.items():
+                table_name=value.get('table_name',None)
+                if table_name!=None and table_name==second_dependency:
+                        fields=value.get('fields',[])
+                        
+
+         # Initialisation de l'entrée pour cette table RDMS
+        dict_tables_dependencies[rdms] = {
+            "rdms_table":first_dependency,
+            "first_hive table":second_dependency,
+            "liste_champs": fields,  # Récupération des champs RDMS
+            "dependencies": {}
+        }
+        for dep in range(0,len(dependencies)):
+            # Récupérer le fichier HQL associé à la table dépendante
+
+            # on stocke les informations de toutes les autres tables dependantes
+            if dep >0:
+                # récupération paths 
+                file_dep = dict_table_paths.get(dependencies[dep], None)
+                # Stocker la dépendance avec son fichier HQL
+                dict_tables_dependencies[rdms]["dependencies"][dependencies[dep]] = file_dep
+    return dict_tables_dependencies
+
+
+def build_lineage(dependencies, results):
+    """
+    Construit le lignage des tables Hive à partir des fichiers HQL.
+
+    Args:
+        dependencies (dict): Dictionnaire des dépendances où chaque clé est une table Hive
+                             et chaque valeur est une liste de fichiers HQL associés.
+        results (dict): Dictionnaire contenant des résultats intermédiaires pouvant être utilisés
+                        par la fonction `create_lineage_dic`.
+
+    Returns:
+        dict: Dictionnaire des lignages où chaque clé est un fichier HQL et chaque valeur est
+              le résultat de l'analyse par `create_lineage_dic`.
+    """
+    lineage = {}
+
+    for hive_table, hql_files in dependencies.items():
+        if isinstance(hql_files, str):  # Gérer le cas où un seul fichier est donné sous forme de chaîne
+            hql_files = [hql_files]
+        
+        for hql_file in hql_files:
+            if not hql_file.startswith("/"):
+                if os.path.exists(hql_file):  # Vérifie que le fichier existe
+                    lineage[hql_file] = create_lineage_dic(hql_file, results)
+                else:
+                    print(f"Fichier HQL non trouvé : {hql_file}")
+
+    return lineage
+
+def track_fields_across_lineage(data, results):
+    """
+    Suit l'origine des champs (`liste_champs`) en fonction des lignages des tables Hive.
+
+    Args:
+        data (dict): Dictionnaire contenant plusieurs tables RDMS et leurs informations :
+                     - "liste_champs" : Liste des champs à suivre
+                     - "dependencies" : Dictionnaire des tables Hive et leurs fichiers HQL associés
+        results (dict): Dictionnaire contenant des résultats intermédiaires pour l'analyse.
+
+    Returns:
+        dict: Dictionnaire contenant le lignage des champs sous la forme :
+              {
+                  "rdms_table1": {
+                      "champ1": ["table1", "table2"],
+                      "champ2": ["table3"]
+                  },
+                  "rdms_table2": {
+                      "champA": ["table4"]
+                  }
+              }
+    """
+    overall_field_tracking = defaultdict(lambda: defaultdict(list))  # Dictionnaire imbriqué {rdms_table -> {champ -> [tables]}}
+
+    for rdms_table, table_data in data.items():
+        liste_champs = table_data.get("liste_champs", [])
+        dependencies = table_data.get("dependencies", {})
+
+        lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
+        
+        for field in liste_champs:
+            for hql_file, tables in lineage.items():
+                for table, details in tables.items():
+                    if any(field in details.get("Colonnes détectées", []) for details in tables.values()):
+                        overall_field_tracking[rdms_table][field].append(table)
+
+    return overall_field_tracking
+
 
 def get_unique_tables_names_from_lineage_dict(lineage_dict:dict)->list:
     """
