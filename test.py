@@ -24,6 +24,7 @@ from data_lineage.utils import process_conf_files
 from data_lineage.utils import get_dir_dependances_2
 from data_lineage.fields import create_dict_tables_dependencies_and_path
 from data_lineage.fields import build_lineage
+from data_lineage.fields import track_fields_across_lineage
 
 hql_content = """
 INSERT INTO AGG.FT_GLOBAL_ACTIVITY_DAILY PARTITION(TRANSACTION_DATE)
@@ -116,7 +117,7 @@ create_table_dic=process_hql_files(file_scripts_paths)
 dic_table_fields=extract_lineage_fields(hql_content)
 directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
 #liste_table=list(dic_table_fields.keys())
-lineage_dic = create_lineage_dic(path,create_table_dic)
+#lineage_dic = create_lineage_dic(path,create_table_dic)
 
 #export_lineage_to_excel(lineage_dic, "lineage_results_pardon_"+name_file+".xlsx")
 dic_rdms_hive=extract_hive_table_and_queries(directory_conf)
@@ -132,34 +133,25 @@ dic_tables_dependencies = get_dir_dependances_2(dic_files_queries_paths)
 dic_rdms_hive_dependencies=generate_dic_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependencies)
 dict_tables_dependencies_and_fields=create_dict_tables_dependencies_and_path(dict_table_paths,dic_rdms_hive_dependencies,create_table_dic)
 
-
-
 print("dict_tables_dependencies_and_fields")
 
 for i,value in dict_tables_dependencies_and_fields.items():
+    print("rdms_table",value.get('rdms_table',None))
+    print("first_hive table",value.get('first_hive table',None))
     dependencies=value.get('dependencies',None)
-    #print(dependencies)
+    print(dependencies)
     break
 
 lineage_dic_for_one_chaine_of_dependencies=build_lineage(dependencies,create_table_dic)
-
-
-
-        
+lineage_fields_across_dependencies=track_fields_across_lineage(dict_tables_dependencies_and_fields,create_table_dic)
 
 #dict_tables_hql_from_request_lineage=get_hql_path_from_table_name(dict_table_paths,list_table_from_hql)
 #print(dict_tables_hql_from_request_lineage)
-
-
 #nom="MON.FT_CONTRACT_SNAPSHOT"
 #for i,value in dict_table_paths.items():
     #contrat=dict_table_paths.get(nom,None)
     
-   
-
 #print(contrat)
-    
-
 #ohrr = r"ange"
 #parts = ohrr.split(";")
 # parts = ["", "PROD", "RAW", "IN_ZTE", "PRICE_PLAN_EXTRACT", "Data_*"]

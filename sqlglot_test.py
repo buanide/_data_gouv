@@ -6,21 +6,30 @@ from sqlglot.optimizer.scope import find_all_in_scope
 from sqlglot.optimizer.scope import build_scope
 from data_lineage.fields import find_tables_in_select
 
-query = "SELECT * FROM ( Select a , b mon.spark_ft_contract_snapshot)"
-expression = sqlglot.parse_one(query, read="hive")
-expression_qualified = qualify(expression)
-all_selects = list(expression_qualified.find_all(exp.Select))
 
+hql_file_path=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\FT\BDI\FT_BDI\PP\insert_into_kyc_bdi_pp_step1.hql'
+try:
+    with open(hql_file_path, "r", encoding="utf-8") as f:
+        hql_content = f.read()
+except FileNotFoundError:
+    print(f"Fichier introuvable: {hql_file_path}")
+    
+expression = sqlglot.parse_one(hql_content, read="hive")
+
+
+try:
+    expression_qualified = qualify(expression)
+except sqlglot.errors.OptimizeError as e:
+    print(f"Warning: {e}")  # Affiche un avertissement sans interrompre l'exécution
+    expression_qualified = expression  
+
+all_selects = list(expression_qualified.find_all(exp.Select))
 for select_expr in all_selects:
-    tables_in_select = find_tables_in_select(select_expr)
-    tables_str = ", ".join(tables_in_select) if tables_in_select else "Aucune table"
-    for proj in select_expr.selects:
-        if isinstance(proj, exp.Alias):
-            alias_name = proj.alias or "NO_ALIAS"
-            expr_to_analyze = proj.this
-        else:
-            alias_name = proj.alias_or_name or "NO_ALIAS"
-            expr_to_analyze = proj
+        tables_in_select = find_tables_in_select(select_expr)
+        # print("tablein select",tables_in_select)
+        tables_str = ", ".join(tables_in_select) if tables_in_select else "Aucune table"
+
+print(tables_str)
 
 """
 # 1) Parser la requête

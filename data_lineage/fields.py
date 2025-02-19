@@ -271,9 +271,9 @@ def find_tables_in_select(select_expr: exp.Select) -> list:
     """
     tables = []
     for table_expr in select_expr.find_all(exp.Table):
-        print("table_expr", table_expr)
+        #print("table_expr", table_expr)
         if table_expr.db:
-            print("db", table_expr.db)
+            #print("db", table_expr.db)
             tables.append(f"{table_expr.db}.{table_expr.name}")
         else:
             tables.append(table_expr.name)
@@ -324,13 +324,21 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
         print(f"Fichier introuvable: {hql_file_path}")
         return {}
 
+
+    
     expression = sqlglot.parse_one(hql_content, read="hive")
     if not expression:
         print(f"Impossible de parser le HQL dans: {hql_file_path}")
         return {}
+    
+    try:
+        expression_qualified = qualify(expression)
+    except sqlglot.errors.OptimizeError as e:
+        print(f"Warning: {e}")  # Affiche un avertissement sans interrompre l'exécution
+        expression_qualified = expression  
 
-    expression_qualified = qualify(expression)
     all_selects = list(expression_qualified.find_all(exp.Select))
+    print("file_path",hql_file_path)
     lineage_dict[hql_file_path] = {}
     for select_expr in all_selects:
         tables_in_select = find_tables_in_select(select_expr)
@@ -445,18 +453,17 @@ def build_lineage(dependencies, results):
               le résultat de l'analyse par `create_lineage_dic`.
     """
     lineage = {}
-
     for hive_table, hql_files in dependencies.items():
+        if hive_table==None or hql_files==None:
+            return {}
         if isinstance(hql_files, str):  # Gérer le cas où un seul fichier est donné sous forme de chaîne
-            hql_files = [hql_files]
-        
+            hql_files = [hql_files]        
         for hql_file in hql_files:
             if not hql_file.startswith("/"):
                 if os.path.exists(hql_file):  # Vérifie que le fichier existe
                     lineage[hql_file] = create_lineage_dic(hql_file, results)
                 else:
                     print(f"Fichier HQL non trouvé : {hql_file}")
-
     return lineage
 
 def track_fields_across_lineage(data, results):
