@@ -7,6 +7,7 @@ from sqlglot.optimizer.scope import build_scope
 import pandas as pd
 from collections import defaultdict
 import os
+from data_lineage.utils import measure_execution_time
 
 
 def extract_table_names(query):
@@ -34,7 +35,7 @@ def extract_table_names(query):
 
 def extract_lineage_fields(hive_sql):
     """
-    Parse a Hive SQL query and extract the lineage fields.
+    
     pour une table en clé on a un liste de champs en valeurs
     """
     expression = sqlglot.parse_one(hive_sql, read="hive")
@@ -212,7 +213,6 @@ def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str
 
     return column_name
 
-
 def analyze_projection(projection: exp.Expression, hql_content: str, results: dict) -> dict:
     """
     Analyse une projection pour extraire :
@@ -222,8 +222,58 @@ def analyze_projection(projection: exp.Expression, hql_content: str, results: di
       - formula_sql : la reconstitution de la projection en SQL
     """
 
-    columns_used = []
+    # Extraire la correspondance des tables et champs une seule fois
+    dic_table_fields = extract_lineage_fields(hql_content)
 
+    # Initialisation des listes
+    columns_used = set()
+    agg_funcs = set()
+    arithmetic_ops = set()
+
+    # Parcours des colonnes utilisées dans la projection
+    for col in projection.find_all(exp.Column):
+        table_part = f"{col.db}.{col.table}" if col.db else col.table or ""
+        column_part = col.name
+        raw_column_name = f"{table_part}.{column_part}" if table_part else column_part
+
+        # Résolution des alias
+        resolved = resolve_column_alias(raw_column_name, dic_table_fields, results)
+        columns_used.add(resolved.lower())  # Conversion en minuscule pour la standardisation
+
+    # Parcours des fonctions d'agrégation
+    for func in projection.find_all(exp.AggFunc):
+        func_name = func.__class__.__name__.upper()
+        agg_funcs.add(func_name)
+
+    # Détection des opérations arithmétiques
+    ARITHMETIC_NODES = {exp.Add: "+", exp.Sub: "-", exp.Mul: "*", exp.Div: "/", exp.Mod: "%"}
+    for node in projection.find_all(tuple(ARITHMETIC_NODES.keys())):
+        op_symbol = ARITHMETIC_NODES[type(node)]
+        arithmetic_ops.add(op_symbol)
+
+    # Reconstitution de la projection en SQL
+    formula_sql = projection.sql(dialect="hive")
+
+    return {
+        "columns_used": list(columns_used),
+        "aggregations": list(agg_funcs),
+        "arithmetic_ops": list(arithmetic_ops),
+        "formula_sql": formula_sql,
+    }
+
+
+"""
+def analyze_projection(projection: exp.Expression, hql_content: str, results: dict) -> dict:
+    
+    Analyse une projection pour extraire :
+      - columns_used : liste des colonnes (résolues si ambiguës) en minuscule
+      - aggregations : liste des fonctions d'agrégation
+      - arithmetic_ops : liste des opérations arithmétiques
+      - formula_sql : la reconstitution de la projection en SQL
+    
+
+    columns_used = []
+    dic_table_fields = extract_lineage_fields(hql_content)
     for col in projection.find_all(exp.Column):
         if col.db:
             table_part = f"{col.db}.{col.table}" or ""
@@ -233,7 +283,7 @@ def analyze_projection(projection: exp.Expression, hql_content: str, results: di
         column_part = col.name
         raw_column_name = f"{table_part}.{column_part}" if table_part else column_part
         # print("raw_column_name",raw_column_name)
-        dic_table_fields = extract_lineage_fields(hql_content)
+       
         # print("raw_column_name")
         # Tenter de résoudre l'ambiguïté (ex. 'a.CHARGE' -> 'mon.spark_ft_contract_snapshot.charge')
         resolved = resolve_column_alias(raw_column_name, dic_table_fields, results)
@@ -261,7 +311,7 @@ def analyze_projection(projection: exp.Expression, hql_content: str, results: di
         "arithmetic_ops": arithmetic_ops,
         "formula_sql": formula_sql,
     }
-
+"""
 
 def find_tables_in_select(select_expr: exp.Select) -> list:
     """
@@ -316,6 +366,7 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
       }
     """
     lineage_dict = {}
+    temp_projection=0
 
     try:
         with open(hql_file_path, "r", encoding="utf-8") as f:
@@ -323,8 +374,6 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
     except FileNotFoundError:
         print(f"Fichier introuvable: {hql_file_path}")
         return {}
-
-
     
     expression = sqlglot.parse_one(hql_content, read="hive")
     if not expression:
@@ -332,7 +381,7 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
         return {}
     
     try:
-        expression_qualified = qualify(expression)
+        expression_qualified= qualify(expression)
     except sqlglot.errors.OptimizeError as e:
         print(f"Warning: {e}")  # Affiche un avertissement sans interrompre l'exécution
         expression_qualified = expression  
@@ -341,7 +390,7 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
     print("file_path",hql_file_path)
     lineage_dict[hql_file_path] = {}
     for select_expr in all_selects:
-        tables_in_select = find_tables_in_select(select_expr)
+        tables_in_select,_ = measure_execution_time(find_tables_in_select,select_expr)
         # print("tablein select",tables_in_select)
         tables_str = ", ".join(tables_in_select) if tables_in_select else "Aucune table"
         for proj in select_expr.selects:
@@ -354,7 +403,8 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
             else:
                 alias_name = proj.alias_or_name or "NO_ALIAS"
                 expr_to_analyze = proj
-            info = analyze_projection(expr_to_analyze, hql_content, results)
+            info,t = measure_execution_time(analyze_projection,expr_to_analyze, hql_content, results)
+            temp_projection+=t
 
             lineage_dict[hql_file_path][alias_name] = {
                 "Alias/Projection": alias_name,
@@ -365,6 +415,8 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
                 "Formule SQL": info["formula_sql"],
                 "Table(s) utilisées": tables_str,
             }
+
+    print("analyse des champs",temp_projection)
 
     return lineage_dict
 

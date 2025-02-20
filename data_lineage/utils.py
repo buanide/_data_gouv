@@ -3,6 +3,7 @@ import re
 import pandas as pd
 from openpyxl.styles import PatternFill
 import sqlparse
+import time
 
 
 def list_all_files(directory: str) -> list:
@@ -693,11 +694,11 @@ def generate_excel_with_rdms_and_dependencies(
     df_unique=df.drop_duplicates()
     #print("taille",len(df_unique))
 
-    print("nb unique raw",df["Raw_Path"].nunique())
-    print("nb unique tt",df["it"].nunique())
+    #print("nb unique raw",df["Raw_Path"].nunique())
+    #print("nb unique tt",df["it"].nunique())
 
     # Exporter le DataFrame vers un fichier Excel
-    #df_unique.to_excel(output_file, index=False)
+    df_unique.to_excel(output_file, index=False)
     # print(f"Fichier Excel généré avec succès : {output_file}")
 
     
@@ -1259,3 +1260,16 @@ def parse_hql_file(file_path):
                 )
 
     return results
+
+
+def measure_execution_time(func, *args, **kwargs):
+    """Mesure le temps d'exécution d'une fonction."""
+    start_time = time.time()
+    result = func(*args, **kwargs)
+    end_time = time.time()
+
+    if func.__name__=="build_lineage":
+        print(f"Temps d'exécution de {func.__name__} : {end_time - start_time:.4f} secondes")
+
+    t=end_time - start_time
+    return result,t  # Retourne le résultat pour pouvoir l'utiliser ensuite
