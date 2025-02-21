@@ -6,9 +6,30 @@ from sqlglot.optimizer.scope import find_all_in_scope
 from sqlglot.optimizer.scope import build_scope
 import pandas as pd
 from collections import defaultdict
+from sqlglot.errors import OptimizeError
 import os
 from data_lineage.utils import measure_execution_time
+from functools import wraps
+import hashlib
 
+# Dictionnaire de cache global
+_analysis_cache = {}
+
+def cache_analyze_projection(func):
+    @wraps(func)
+    def wrapper(projection, hql_content, results):
+        # Générer une clé unique basée sur le HQL
+        hql_hash = hashlib.md5(hql_content.encode('utf-8')).hexdigest()
+        
+        if hql_hash in _analysis_cache:
+            return _analysis_cache[hql_hash]
+        
+        # Calcul de la projection et mise en cache
+        result = func(projection, hql_content, results)
+        _analysis_cache[hql_hash] = result
+        return result
+    
+    return wrapper
 
 def extract_table_names(query):
     """
@@ -32,14 +53,35 @@ def extract_table_names(query):
 
     return list(table_names)
 
+def remove_comments(sql):
+    # Supprime les commentaires de ligne (commençant par -- ou ---)
+    sql = re.sub(r'--+.*?(\r\n|\r|\n)', '\n', sql)
+    # Supprime les commentaires en bloc /* ... */
+    sql = re.sub(r'/\*.*?\*/', '', sql, flags=re.DOTALL)
+    return sql
+
+def remove_hql_trim(hql_content):
+    # Supprime les trim() vides
+    hql_content = re.sub(r'trim\s*\(\s*\)', "''", hql_content, flags=re.IGNORECASE)
+    return hql_content
+
 
 def extract_lineage_fields(hive_sql):
     """
     
     pour une table en clé on a un liste de champs en valeurs
     """
-    expression = sqlglot.parse_one(hive_sql, read="hive")
-    expression_qualified = qualify(expression)
+
+    cleaned_hive_sql = remove_comments(hive_sql)
+    cleaned_hive_sql= remove_hql_trim(cleaned_hive_sql)
+    expression = sqlglot.parse_one(cleaned_hive_sql, read="hive")
+
+    try:
+        expression_qualified = qualify(expression)
+    except OptimizeError as e:
+        #print("Warning: Erreur d'optimisation capturée dans extract_lineage_fields :", e)
+        expression_qualified = expression  # On continue avec l'expression non qualifiée
+    
     root = build_scope(expression_qualified)
     # print("root",root)
     dic = {}
@@ -63,6 +105,7 @@ def extract_lineage_fields(hive_sql):
     for t in dic:
         dic[t] = list(dic[t])
     return dic
+    
 
 
 def extract_table_details_with_partition_and_if_not_exists(file_path):
@@ -213,6 +256,7 @@ def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str
 
     return column_name
 
+@cache_analyze_projection
 def analyze_projection(projection: exp.Expression, hql_content: str, results: dict) -> dict:
     """
     Analyse une projection pour extraire :
@@ -375,6 +419,8 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
         print(f"Fichier introuvable: {hql_file_path}")
         return {}
     
+    hql_content=remove_comments(hql_content)
+    hql_content=remove_hql_trim(hql_content)
     expression = sqlglot.parse_one(hql_content, read="hive")
     if not expression:
         print(f"Impossible de parser le HQL dans: {hql_file_path}")
@@ -385,7 +431,6 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
     except sqlglot.errors.OptimizeError as e:
         print(f"Warning: {e}")  # Affiche un avertissement sans interrompre l'exécution
         expression_qualified = expression  
-
     all_selects = list(expression_qualified.find_all(exp.Select))
     print("file_path",hql_file_path)
     lineage_dict[hql_file_path] = {}
