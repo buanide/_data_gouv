@@ -88,12 +88,23 @@ def extract_lineage_fields(hive_sql):
 
     for column in find_all_in_scope(root.expression, exp.Column):
         # print(root.sources)
-        tables = extract_table_names(str(root.sources[column.table]))
+        table_name=column.table
+
+        if not table_name:
+            table_name = "UNKNOWN_TABLE"
+            print("unknwo table pour colonne",column)
+   
+        #root.sources est un dictionnaire qui associe les noms de tables aux sources SQL correspondantes.
+        if table_name in root.sources:
+            tables = extract_table_names(str(root.sources[table_name]))
+            a = str(column).split(".")[1].strip('"')
+        else:
+            tables = [table_name]
+            a=column.name
         # print(f"coloumn : {str(column).split('.')[1]} => source: {extract_table_names(str(root.sources[column.table]))}")
         # print("")
         # Retirer les guillemets du champ
         # print("expre",str(column))
-        a = str(column).split(".")[1].strip('"')
         # print("champs",a)
         for t in tables:
             # Si le nom de la table n'existe pas encore dans le dictionnaire,
@@ -195,7 +206,7 @@ def extract_table_details_with_partition_and_if_not_exists(file_path):
 def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str:
     """
     dic_path(dict) 'dic_path' : dictionnaire des table->list champs pour la requête courante
-    results(dict): dictionaire des provenant des requêtes create table, table->liste des champs
+    results(dict): dictionaire des champs  provenant des requêtes create table, table->liste des champs
 
     :param column_name: ex: 'a.CHARGE' ou juste 'CHARGE'
     :param file_path: la clé pour accéder à results[file_path]
@@ -214,6 +225,7 @@ def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str
     # 1) Isoler le col_name (sans alias)
     # print("column_name",column_name)
     split_col = column_name.split(".")
+    #print("split_col",split_col)
     # print("split_col:",split_col,"taille:",len(split_col))
     if len(split_col) == 2:
         # alias = 'a', col_name = 'CHARGE' (ex.)
@@ -226,7 +238,7 @@ def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str
     else:
         # Pas de point => la colonne est directe
         # (ex. col_name = 'CHARGE')
-        # col_name=column_name
+        col_name=column_name
         pass
 
     # 2) Convertir en majuscules pour la comparaison
@@ -278,8 +290,9 @@ def analyze_projection(projection: exp.Expression, hql_content: str, results: di
     for col in projection.find_all(exp.Column):
         table_part = f"{col.db}.{col.table}" if col.db else col.table or ""
         column_part = col.name
+        #print('col.db',col.db,'col.table',col.table,'col.name',col.name)
         raw_column_name = f"{table_part}.{column_part}" if table_part else column_part
-
+        #print("raw_column_name",raw_column_name)
         # Résolution des alias
         resolved = resolve_column_alias(raw_column_name, dic_table_fields, results)
         columns_used.add(resolved.lower())  # Conversion en minuscule pour la standardisation
@@ -551,16 +564,21 @@ def build_lineage(dependencies, results):
     """
     lineage = {}
     for hive_table, hql_files in dependencies.items():
-        if hive_table==None or hql_files==None:
-            return {}
-        if isinstance(hql_files, str):  # Gérer le cas où un seul fichier est donné sous forme de chaîne
-            hql_files = [hql_files]        
-        for hql_file in hql_files:
-            if not hql_file.startswith("/"):
-                if os.path.exists(hql_file):  # Vérifie que le fichier existe
-                    lineage[hql_file] = create_lineage_dic(hql_file, results)
-                else:
-                    print(f"Fichier HQL non trouvé : {hql_file}")
+        if hive_table!=None:
+
+            if isinstance(hql_files, str):  # Gérer le cas où un seul fichier est donné sous forme de chaîne
+                hql_files = [hql_files] 
+            if hql_files!=None:       
+                for hql_file in hql_files:
+                    if not hql_file.startswith("/"):
+                        if os.path.exists(hql_file):  # Vérifie que le fichier existe
+                            current_lineage_dict=create_lineage_dic(hql_file, results)
+                            #print("current_lineage_dict",current_lineage_dict)
+                            lineage[hql_file] = current_lineage_dict
+                        else:
+                            print(f"Fichier HQL non trouvé : {hql_file}")
+            else:
+                pass
     return lineage
 
 def track_fields_across_lineage(data, results):
@@ -590,9 +608,7 @@ def track_fields_across_lineage(data, results):
     for rdms_table, table_data in data.items():
         liste_champs = table_data.get("liste_champs", [])
         dependencies = table_data.get("dependencies", {})
-
         lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
-        
         for field in liste_champs:
             for hql_file, tables in lineage.items():
                 for table, details in tables.items():

@@ -1272,4 +1272,5 @@ def measure_execution_time(func, *args, **kwargs):
         print(f"Temps d'exécution de {func.__name__} : {end_time - start_time:.4f} secondes")
 
     t=end_time - start_time
+    
     return result,t  # Retourne le résultat pour pouvoir l'utiliser ensuite

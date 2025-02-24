@@ -1,4 +1,5 @@
 import sqlglot
+import os
 from sqlglot import exp
 from sqlglot import parse_one
 from sqlglot.optimizer.scope import find_all_in_scope
@@ -15,7 +16,6 @@ from data_lineage.fields import create_lineage_dic
 from data_lineage.fields import print_lineage_dict
 from data_lineage.utils import map_rdms_file_hql_file
 from data_lineage.utils import extract_hive_table_and_queries
-import os
 from data_lineage.fields import get_unique_tables_names_from_lineage_dict
 from data_lineage.utils import extract_exec_queries
 from data_lineage.utils import generate_dic_with_rdms_and_dependencies
@@ -119,7 +119,7 @@ hdfs_dir = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS"
 paths_scripts=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS'
 file_scripts_paths=list_all_files(paths_scripts)
 create_table_dic=process_hql_files(file_scripts_paths)
-dic_table_fields=extract_lineage_fields(hql_content)
+#dic_table_fields=extract_lineage_fields(hql_content)
 directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
 #liste_table=list(dic_table_fields.keys())
 lineage_dic,_ = measure_execution_time(create_lineage_dic, path, create_table_dic)
@@ -148,7 +148,7 @@ for i,value in dict_tables_dependencies_and_fields.items():
     print(dependencies)
     break
 
-lineage_dic_for_one_chaine_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
+#lineage_dic_for_one_chaine_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
 
 lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,dict_tables_dependencies_and_fields,create_table_dic)
 #dict_tables_hql_from_request_lineage=get_hql_path_from_table_name(dict_table_paths,list_table_from_hql)

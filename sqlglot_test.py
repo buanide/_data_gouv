@@ -14,7 +14,7 @@ from data_lineage.fields import remove_comments
 from data_lineage.utils import measure_execution_time
 
 
-hql_file_path=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\FT\CLIENT360\compute_and_insert_into_spark_ft_client_360.hql'
+hql_file_path=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\FT\BDI\FT_MSISDN_IMEI_LOCALISATION_TO_BDI\insert_into_tt_bdi_localisation2.hql'
 try:
     with open(hql_file_path, "r", encoding="utf-8") as file:
         content = file.read()
