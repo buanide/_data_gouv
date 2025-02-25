@@ -27,93 +27,10 @@ from data_lineage.fields import build_lineage
 from data_lineage.fields import track_fields_across_lineage
 import time
 from data_lineage.utils import measure_execution_time
+from data_lineage.fields import export_tracking_lineage_to_excel
 
 # Démarrer le chronomètre
-
-
-hql_content = """
-INSERT INTO AGG.FT_GLOBAL_ACTIVITY_DAILY PARTITION(TRANSACTION_DATE)
-SELECT 
-    COMMERCIAL_OFFER_CODE
-    , TRANSACTION_TYPE
-    , SUB_ACCOUNT
-    , TRANSACTION_SIGN
-    , SOURCE_PLATFORM
-    , SOURCE_DATA
-    , SERVED_SERVICE
-    , SERVICE_CODE
-    , DESTINATION_CODE
-    , SERVED_LOCATION
-    , MEASUREMENT_UNIT
-    , RATED_COUNT
-    , RATED_VOLUME
-    , TAXED_AMOUNT
-    , UNTAXED_AMOUNT
-    , INSERT_DATE
-    , TRAFFIC_MEAN
-    , OPERATOR_CODE
-    , NULL LOCATION_CI
-    , TRANSACTION_DATE
-FROM(
-    SELECT
-     DEACTIVATION_DATE TRANSACTION_DATE
-    ,UPPER(PROFILE) COMMERCIAL_OFFER_CODE
-    ,'DEACTIVATED_ACCOUNT_BALANCE' TRANSACTION_TYPE
-    ,'MAIN' SUB_ACCOUNT
-    ,'-' TRANSACTION_SIGN
-    , 'IN' SOURCE_PLATFORM
-    ,'FT_CONTRACT_SNAPSHOT'  SOURCE_DATA
-    , 'IN_ACCOUNT' SERVED_SERVICE
-    , 'NVX_BALANCE' SERVICE_CODE
-    , 'DEST_ND' DESTINATION_CODE
-    , NULL SERVED_LOCATION
-    ,'HIT' MEASUREMENT_UNIT
-    , SUM (1) RATED_COUNT
-    , SUM (1) RATED_VOLUME
-    , SUM (MAIN_CREDIT) TAXED_AMOUNT
-    , SUM ((1-0.1925) * MAIN_CREDIT) UNTAXED_AMOUNT
-    , CURRENT_TIMESTAMP INSERT_DATE
-    ,'REVENUE' TRAFFIC_MEAN
-    , OPERATOR_CODE OPERATOR_CODE
-   FROM MON.FT_CONTRACT_SNAPSHOT
-   WHERE EVENT_DATE = '###SLICE_VALUE###' AND DEACTIVATION_DATE = '###SLICE_VALUE###'  
-    AND MAIN_CREDIT > 0
-   GROUP BY  
-    DEACTIVATION_DATE
-    ,UPPER(PROFILE)
-    , OPERATOR_CODE
-    UNION
-    SELECT
-     DEACTIVATION_DATE TRANSACTION_DATE
-    ,UPPER(PROFILE) COMMERCIAL_OFFER_CODE
-    ,'DEACTIVATED_ACCOUNT_BALANCE' TRANSACTION_TYPE
-    ,'PROMO' SUB_ACCOUNT
-    ,'-' TRANSACTION_SIGN
-    , 'IN' SOURCE_PLATFORM
-    ,'FT_CONTRACT_SNAPSHOT'  SOURCE_DATA
-    , 'IN_ACCOUNT' SERVED_SERVICE
-    , 'NVX_BALANCE' SERVICE_CODE
-    , 'DEST_ND' DESTINATION_CODE
-    , NULL SERVED_LOCATION
-    ,'HIT' MEASUREMENT_UNIT
-    , SUM (1) RATED_COUNT
-    , SUM (1) RATED_VOLUME
-    , SUM (PROMO_CREDIT) TAXED_AMOUNT
-    , SUM ((1-0.1925) * PROMO_CREDIT) UNTAXED_AMOUNT
-    , CURRENT_TIMESTAMP INSERT_DATE
-    ,'REVENUE' TRAFFIC_MEAN
-    , OPERATOR_CODE OPERATOR_CODE
-   FROM MON.FT_CONTRACT_SNAPSHOT
-   WHERE EVENT_DATE = '###SLICE_VALUE###' AND DEACTIVATION_DATE = '###SLICE_VALUE###'  
-    AND PROMO_CREDIT > 0
-   GROUP BY  
-    DEACTIVATION_DATE
-    ,UPPER(PROFILE)
-    , OPERATOR_CODE
-) A;
-"""
-
-path=r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS\REPORT\GLOBAL_ACTIVITY\compute_and_insert_contract_snapshot_activity.hql"
+path=r"C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_BDI_AMELIORE\\insert_into_spark_ft_bdi_ameliore.hql"
 name_file=os.path.basename(path)
 hdfs_dir = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS"
 paths_scripts=r'C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\SCRIPTS'
@@ -122,8 +39,8 @@ create_table_dic=process_hql_files(file_scripts_paths)
 #dic_table_fields=extract_lineage_fields(hql_content)
 directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
 #liste_table=list(dic_table_fields.keys())
-lineage_dic,_ = measure_execution_time(create_lineage_dic, path, create_table_dic)
-export_lineage_to_excel(lineage_dic, "lineage_results_new_projection_function_"+name_file+".xlsx")
+#lineage_dic,_ = measure_execution_time(create_lineage_dic, path, create_table_dic)
+#export_lineage_to_excel(lineage_dic, "lineage_"+name_file+".xlsx")
 
 dic_rdms_hive=extract_hive_table_and_queries(directory_conf)
 dict_table_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
@@ -140,17 +57,21 @@ dic_tables_dependencies = get_dir_dependances_2(dic_files_queries_paths)
 dic_rdms_hive_dependencies=generate_dic_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependencies)
 # permet de ratacher à chaque source de données le ou les noms des hql qui l'alimente
 dict_tables_dependencies_and_fields,_=measure_execution_time(create_dict_tables_dependencies_and_path,dict_table_paths,dic_rdms_hive_dependencies,create_table_dic)
-print("dict_tables_dependencies_and_fields")
+#print("dict_tables_dependencies_and_fields")
+
+"""
 for i,value in dict_tables_dependencies_and_fields.items():
     print("rdms_table",value.get('rdms_table',None))
     print("first_hive table",value.get('first_hive table',None))
     dependencies=value.get('dependencies',None)
     print(dependencies)
     break
-
-#lineage_dic_for_one_chaine_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
-
-lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,dict_tables_dependencies_and_fields,create_table_dic)
+"""
+#lineage_dic_for_one_chain_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
+rdms_table_name='MON.FT_A_CNI_EXPIREES'
+lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,rdms_table_name,dict_tables_dependencies_and_fields,create_table_dic)
+#print("lineage_fields_across_dependencies",lineage_fields_across_dependencies)
+#export_tracking_lineage_to_excel(lineage_fields_across_dependencies,"lineage_"+rdms_table_name+".xlsx")
 #dict_tables_hql_from_request_lineage=get_hql_path_from_table_name(dict_table_paths,list_table_from_hql)
 #print(dict_tables_hql_from_request_lineage)
 #nom="MON.FT_CONTRACT_SNAPSHOT"

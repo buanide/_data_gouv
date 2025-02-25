@@ -18,18 +18,27 @@ _analysis_cache = {}
 def cache_analyze_projection(func):
     @wraps(func)
     def wrapper(projection, hql_content, results):
-        # Générer une clé unique basée sur le HQL
         hql_hash = hashlib.md5(hql_content.encode('utf-8')).hexdigest()
         
-        if hql_hash in _analysis_cache:
-            return _analysis_cache[hql_hash]
-        
-        # Calcul de la projection et mise en cache
+        # Initialiser le cache pour ce HQL s'il n'existe pas
+        if hql_hash not in _analysis_cache:
+            _analysis_cache[hql_hash] = {}
+
+        # Générer un identifiant unique pour la projection (hash de son SQL)
+        projection_sql = projection.sql(dialect="hive")
+        projection_hash = hashlib.md5(projection_sql.encode('utf-8')).hexdigest()
+
+        # Vérifier si la projection est déjà analysée
+        if projection_hash in _analysis_cache[hql_hash]:
+            return _analysis_cache[hql_hash][projection_hash]
+
+        # Calcul de l'analyse et stockage
         result = func(projection, hql_content, results)
-        _analysis_cache[hql_hash] = result
+        _analysis_cache[hql_hash][projection_hash] = result
         return result
     
     return wrapper
+
 
 def extract_table_names(query):
     """
@@ -92,7 +101,7 @@ def extract_lineage_fields(hive_sql):
 
         if not table_name:
             table_name = "UNKNOWN_TABLE"
-            print("unknwo table pour colonne",column)
+            #print("unknwo table pour colonne",column)
    
         #root.sources est un dictionnaire qui associe les noms de tables aux sources SQL correspondantes.
         if table_name in root.sources:
@@ -226,7 +235,7 @@ def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str
     # print("column_name",column_name)
     split_col = column_name.split(".")
     #print("split_col",split_col)
-    # print("split_col:",split_col,"taille:",len(split_col))
+    #print("split_col:",split_col,"taille:",len(split_col))
     if len(split_col) == 2:
         # alias = 'a', col_name = 'CHARGE' (ex.)
         _, col_name = split_col
@@ -281,13 +290,16 @@ def analyze_projection(projection: exp.Expression, hql_content: str, results: di
     # Extraire la correspondance des tables et champs une seule fois
     dic_table_fields = extract_lineage_fields(hql_content)
 
+    #print("dic_table_fields",dic_table_fields)
     # Initialisation des listes
-    columns_used = set()
+    columns_used = []
     agg_funcs = set()
     arithmetic_ops = set()
 
+    #print("projection",projection)
     # Parcours des colonnes utilisées dans la projection
     for col in projection.find_all(exp.Column):
+        #print("col",col)
         table_part = f"{col.db}.{col.table}" if col.db else col.table or ""
         column_part = col.name
         #print('col.db',col.db,'col.table',col.table,'col.name',col.name)
@@ -295,7 +307,8 @@ def analyze_projection(projection: exp.Expression, hql_content: str, results: di
         #print("raw_column_name",raw_column_name)
         # Résolution des alias
         resolved = resolve_column_alias(raw_column_name, dic_table_fields, results)
-        columns_used.add(resolved.lower())  # Conversion en minuscule pour la standardisation
+        columns_used.append(resolved)  # Conversion en minuscule pour la standardisation
+        
 
     # Parcours des fonctions d'agrégation
     for func in projection.find_all(exp.AggFunc):
@@ -461,6 +474,8 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
             else:
                 alias_name = proj.alias_or_name or "NO_ALIAS"
                 expr_to_analyze = proj
+            
+            #print("expr to analyze",expr_to_analyze)
             info,t = measure_execution_time(analyze_projection,expr_to_analyze, hql_content, results)
             temp_projection+=t
 
@@ -473,9 +488,8 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
                 "Formule SQL": info["formula_sql"],
                 "Table(s) utilisées": tables_str,
             }
-
     print("analyse des champs",temp_projection)
-
+    #print("lineage_dict",lineage_dict)
     return lineage_dict
 
 
@@ -575,15 +589,16 @@ def build_lineage(dependencies, results):
                             current_lineage_dict=create_lineage_dic(hql_file, results)
                             #print("current_lineage_dict",current_lineage_dict)
                             lineage[hql_file] = current_lineage_dict
+                            #print("lineage",lineage)
                         else:
                             print(f"Fichier HQL non trouvé : {hql_file}")
             else:
                 pass
     return lineage
 
-def track_fields_across_lineage(data, results):
+def track_fields_across_lineage(rdms_table_name,data, results):
     """
-    Suit l'origine des champs (`liste_champs`) en fonction des lignages des tables Hive.
+    Suit les opérations menés sur les colonnes de la première à la dernière table pour chaque ligne de dépendances  
 
     Args:
         data (dict): Dictionnaire contenant plusieurs tables RDMS et leurs informations :
@@ -594,29 +609,105 @@ def track_fields_across_lineage(data, results):
     Returns:
         dict: Dictionnaire contenant le lignage des champs sous la forme :
               {
-                  "rdms_table1": {
-                      "champ1": ["table1", "table2"],
-                      "champ2": ["table3"]
-                  },
-                  "rdms_table2": {
-                      "champA": ["table4"]
-                  }
+                  "champ1": [
+                      { "chemin_du_fichier.hql": "path/alors/exec.hql",
+                        "Opérations arithmétiques": ["+", "-", ...],
+                        "Formule SQL": "SELECT ... FROM ... WHERE ...",
+                        "Table(s) utilisées": ["table1", "table2"]},
+                      { ... }
+                  ],
+                  "champ2": [ ... ]
               }
     """
-    overall_field_tracking = defaultdict(lambda: defaultdict(list))  # Dictionnaire imbriqué {rdms_table -> {champ -> [tables]}}
-
-    for rdms_table, table_data in data.items():
-        liste_champs = table_data.get("liste_champs", [])
-        dependencies = table_data.get("dependencies", {})
-        lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
-        for field in liste_champs:
+    overall_field_tracking = {}
+    for i, info in data.items():
+        #liste_champs = table_data.get("liste_champs", [])
+        rdms=info.get('rdms_table')
+        if rdms.lower()==rdms_table_name.lower():
+            print("ok")
+            dependencies = info.get("dependencies", {})
+            lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
+            #print("lineage",lineage)
             for hql_file, tables in lineage.items():
                 for table, details in tables.items():
-                    if any(field in details.get("Colonnes détectées", []) for details in tables.values()):
-                        overall_field_tracking[rdms_table][field].append(table)
+                    detected_column = details.get("Colonnes détectées", [])
+                    if detected_column==[]:
+                        detected_column=details.get("Alias/Projection",None)
+                    if detected_column!=[] and detected_column!=None:
+                        #print("detected_column",detected_column)
+                        detected_column=detected_column.lower()
+                        # Initialisation de la clé pour le champ si elle n'existe pas
+                        if detected_column not in overall_field_tracking:
+                            overall_field_tracking[detected_column] = []
+                            # Ajout d'une nouvelle entrée pour ce champ
+                            field_entry = {
+                                "chemin_du_fichier.hql": hql_file,
+                                "Opérations arithmétiques": details.get("Opérations arithmétiques", []),
+                                "Formule SQL": details.get("Formule SQL", ""),
+                                "Table(s) utilisées": [table]  # Une liste contenant cette table
+                            }
+
+                            # Ajouter l'entrée à la liste du champ
+                            overall_field_tracking[detected_column].append(field_entry)
+
 
     return overall_field_tracking
 
+
+
+def export_tracking_lineage_to_excel(lineage_data, file_name):
+    """
+    Exporte le lineage des champs sous forme d'un fichier Excel.
+
+    Args:
+        lineage_data (dict): Résultat de `track_fields_across_lineage`
+        file_name (str): Nom du fichier Excel de sortie (par défaut "lineage_tracking.xlsx")
+    """
+    all_data = []
+
+    for field, entries in lineage_data.items():
+        for entry in entries:
+            all_data.append({
+                "Champ": field,
+                "Chemin du fichier HQL": entry["chemin_du_fichier.hql"],
+                "Opérations arithmétiques": ", ".join(entry["Opérations arithmétiques"]),
+                "Formule SQL": entry["Formule SQL"],
+                "Tables utilisées": ", ".join(entry["Table(s) utilisées"])
+            })
+
+    # Création du DataFrame
+    df = pd.DataFrame(all_data)
+
+    # Exporter vers Excel
+    df.to_excel(file_name, index=False, engine="openpyxl")
+    
+
+
+
+"""
+
+{
+
+        "champ1": [{
+            "chemin_du_fichier.hql": "query1.hql",
+            "Opérations arithmétiques": ["+"],
+            "Formule SQL": "SELECT champ1 FROM table_hive_1",
+            "Table(s) utilisées": ["table_hive_1"]
+        }, {
+            "chemin_du_fichier.hql": "query1.hql",
+            "Opérations arithmétiques": ["+"],
+            "Formule SQL": "SELECT champ1 FROM table_hive_1",
+            "Table(s) utilisées": ["table_hive_1"]
+        },{
+            "chemin_du_fichier.hql": "query1.hql",
+            "Opérations arithmétiques": ["+"],
+            "Formule SQL": "SELECT champ1 FROM table_hive_1",
+            "Table(s) utilisées": ["table_hive_1"]
+        }],
+        "champ2": [{    },]
+}
+
+"""
 
 def get_unique_tables_names_from_lineage_dict(lineage_dict:dict)->list:
     """
