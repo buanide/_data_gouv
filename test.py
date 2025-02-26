@@ -70,6 +70,8 @@ for i,value in dict_tables_dependencies_and_fields.items():
 #lineage_dic_for_one_chain_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
 rdms_table_name='MON.FT_A_CNI_EXPIREES'
 lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,rdms_table_name,dict_tables_dependencies_and_fields,create_table_dic)
+
+
 #print("lineage_fields_across_dependencies",lineage_fields_across_dependencies)
 #export_tracking_lineage_to_excel(lineage_fields_across_dependencies,"lineage_"+rdms_table_name+".xlsx")
 #dict_tables_hql_from_request_lineage=get_hql_path_from_table_name(dict_table_paths,list_table_from_hql)

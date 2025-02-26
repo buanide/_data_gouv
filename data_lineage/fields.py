@@ -624,33 +624,39 @@ def track_fields_across_lineage(rdms_table_name,data, results):
         #liste_champs = table_data.get("liste_champs", [])
         rdms=info.get('rdms_table')
         if rdms.lower()==rdms_table_name.lower():
-            print("ok")
-            dependencies = info.get("dependencies", {})
+            #print("ok")
+            dependencies = info.get("dependencies",None)
             lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
             #print("lineage",lineage)
             for hql_file, tables in lineage.items():
                 for table, details in tables.items():
-                    detected_column = details.get("Colonnes détectées", [])
-                    if detected_column==[]:
-                        detected_column=details.get("Alias/Projection",None)
-                    if detected_column!=[] and detected_column!=None:
-                        #print("detected_column",detected_column)
-                        detected_column=detected_column.lower()
-                        # Initialisation de la clé pour le champ si elle n'existe pas
-                        if detected_column not in overall_field_tracking:
-                            overall_field_tracking[detected_column] = []
-                            # Ajout d'une nouvelle entrée pour ce champ
+                    for key, info in details.items():
+                        detected_column = info.get("Colonnes détectées",None)
+                        if not detected_column:  # Si aucune colonne détectée
+                            detected_column = "NO DETECTED COLUMN"
+                            if not detected_column:
+                                detected_column = "INCONNUE"
+
+                        # Si c'est une liste, on la met en minuscule
+                        if isinstance(detected_column, list):
+                            detected_column = [col.lower() for col in detected_column]
+                        else:
+                            detected_column = detected_column.lower()
+
+                        for col in detected_column if isinstance(detected_column, list) else [detected_column]:
+                            if col not in overall_field_tracking:
+                                overall_field_tracking[col] = []
+
                             field_entry = {
-                                "chemin_du_fichier.hql": hql_file,
-                                "Opérations arithmétiques": details.get("Opérations arithmétiques", []),
-                                "Formule SQL": details.get("Formule SQL", ""),
-                                "Table(s) utilisées": [table]  # Une liste contenant cette table
+                                "path": hql_file,
+                                "colonne": col,
+                                "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
+                                "Alias": info.get("Alias/Projection", None),
+                                "Formule SQL": info.get("Formule SQL", ""),
+                                "Table(s) utilisées": info.get("Table(s) utilisées", "")
                             }
 
-                            # Ajouter l'entrée à la liste du champ
-                            overall_field_tracking[detected_column].append(field_entry)
-
-
+                            overall_field_tracking[col].append(field_entry)
     return overall_field_tracking
 
 
@@ -664,20 +670,20 @@ def export_tracking_lineage_to_excel(lineage_data, file_name):
         file_name (str): Nom du fichier Excel de sortie (par défaut "lineage_tracking.xlsx")
     """
     all_data = []
-
     for field, entries in lineage_data.items():
         for entry in entries:
             all_data.append({
-                "Champ": field,
-                "Chemin du fichier HQL": entry["chemin_du_fichier.hql"],
+                "Champ": entry.get("colonne", ""),
+                "Alias":entry.get("Alias",""),
+                "Chemin du fichier HQL": entry["path"],
                 "Opérations arithmétiques": ", ".join(entry["Opérations arithmétiques"]),
                 "Formule SQL": entry["Formule SQL"],
-                "Tables utilisées": ", ".join(entry["Table(s) utilisées"])
+                "Tables utilisées": entry.get("Table(s) utilisées", "")
             })
 
     # Création du DataFrame
     df = pd.DataFrame(all_data)
-
+    df= df.drop_duplicates()
     # Exporter vers Excel
     df.to_excel(file_name, index=False, engine="openpyxl")
     
