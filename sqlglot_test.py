@@ -63,7 +63,7 @@ for i,value in dict_tables_dependencies_and_fields.items():
     #print(dependencies)
 
 #lineage_dic_for_one_chain_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
-rdms_table_name='MON.FT_A_DATA_TRANSFER'
+rdms_table_name='MON.FT_GLOBAL_ACTIVITY_DAILY'
 #for i,value in lineage_dic_for_one_chain_of_dependencies.items():
 #    print("path",i)
  #   print("dic",value)

@@ -12,10 +12,19 @@ from data_lineage.utils import measure_execution_time
 from functools import wraps
 import hashlib
 
-# Dictionnaire de cache global
+
 _analysis_cache = {}
 
 def cache_analyze_projection(func):
+     """
+    Decorator to cache the results of SQL projection analysis.
+
+    Args:
+        func (function): The projection analysis function to decorate.
+
+    Returns:
+        function: The decorated function with caching logic.
+    """
     @wraps(func)
     def wrapper(projection, hql_content, results):
         hql_hash = hashlib.md5(hql_content.encode('utf-8')).hexdigest()
@@ -41,10 +50,16 @@ def cache_analyze_projection(func):
 
 
 def extract_table_names(query):
-    """
-    Recherche toutes les occurrences d'une clause du type :
-    FROM "mon"."spark_ft_contract_snapshot" AS "alias"
-    et renvoie la liste des noms de tables, au format mon.spark_ft_contract_snapshot.
+   """
+    Searches for all occurrences of a clause of the type:
+    FROM "schema"."table" AS "alias"
+    and returns a list of table names in the format schema.table.
+
+    Args:
+        query (str): The SQL query to analyze.
+
+    Returns:
+        list: A list of table names found in the query.
     """
     # Cette regex capture :
     # 1) Le schéma ou database (tout ce qui est entre le premier pair de guillemets)
@@ -63,6 +78,15 @@ def extract_table_names(query):
     return list(table_names)
 
 def remove_comments(sql):
+       """
+    Removes line and block comments from an SQL query.
+
+    Args:
+        sql (str): The SQL content to clean.
+
+    Returns:
+        str: The SQL content without comments.
+    """
     # Supprime les commentaires de ligne (commençant par -- ou ---)
     sql = re.sub(r'--+.*?(\r\n|\r|\n)', '\n', sql)
     # Supprime les commentaires en bloc /* ... */
@@ -70,6 +94,15 @@ def remove_comments(sql):
     return sql
 
 def remove_hql_trim(hql_content):
+    """
+    Removes empty trim() functions from an HQL query.
+
+    Args:
+        hql_content (str): The HQL content to clean.
+
+    Returns:
+        str: The HQL content without empty trim() functions.
+    """
     # Supprime les trim() vides
     hql_content = re.sub(r'trim\s*\(\s*\)', "''", hql_content, flags=re.IGNORECASE)
     return hql_content
@@ -77,8 +110,13 @@ def remove_hql_trim(hql_content):
 
 def extract_lineage_fields(hive_sql):
     """
-    
-    pour une table en clé on a un liste de champs en valeurs
+    Extracts the lineage fields for a table in a Hive SQL query.
+
+    Args:
+        hive_sql (str): The Hive SQL query to analyze.
+
+    Returns:
+        dict: A dictionary where the key is the table name and the value is a list of fields.
     """
 
     cleaned_hive_sql = remove_comments(hive_sql)
@@ -130,12 +168,15 @@ def extract_lineage_fields(hive_sql):
 
 def extract_table_details_with_partition_and_if_not_exists(file_path):
     """
-    Extrait le nom de la table, les noms des champs, les informations de partition
-    et la présence de 'IF NOT EXISTS' d'une requête CREATE TABLE (ou CREATE EXTERNAL TABLE)
-    dans un fichier .hql.
+    Extracts the table name, field names, partition information,
+    and the presence of 'IF NOT EXISTS' from a CREATE TABLE (or CREATE EXTERNAL TABLE) query
+    in an .hql file.
 
-    Note : Dans cette version, tous les éléments (nom de table, noms de champs, clause de partition)
-    sont renvoyés en majuscules. 'if_not_exists' reste un booléen.
+    Args:
+        file_path (str): The path to the HQL file to analyze.
+
+    Returns:
+        tuple: Contains the table name, a list of field names, partition information, and a boolean indicating the presence of 'IF NOT EXISTS'.
     """
     try:
         with open(file_path, "r", encoding="utf-8") as file:
@@ -189,15 +230,11 @@ def extract_table_details_with_partition_and_if_not_exists(file_path):
             if group3 and "PARTITIONED BY" in group3.upper():
                 partitioned_by = group3
 
-        # --- Convertir en MAJUSCULES ---
-        # 1) Table name
         if table_name:
             table_name = table_name.upper()
 
-        # 2) Field names
         field_names = [f.upper() for f in field_names]
 
-        # 3) Partitioned by
         if partitioned_by:
             partitioned_by = partitioned_by.upper()
 
@@ -213,29 +250,33 @@ def extract_table_details_with_partition_and_if_not_exists(file_path):
 
 
 def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str:
-    """
-    dic_path(dict) 'dic_path' : dictionnaire des table->list champs pour la requête courante
-    results(dict): dictionaire des champs  provenant des requêtes create table, table->liste des champs
 
-    :param column_name: ex: 'a.CHARGE' ou juste 'CHARGE'
-    :param file_path: la clé pour accéder à results[file_path]
-    :param results: dict de la forme
-        results[file_path] = [
+    """
+    Resolves column aliases in an SQL query.
+
+    Args:
+        column_name (str): The name of the column to resolve.
+        dic_path (dict): Dictionary of tables and their fields for the current query.
+        results (dict): Dictionary of fields from CREATE TABLE queries. (results[file_path] = [
           {
             "table_name": "mon.spark_ft_contract_snapshot",
             "fields": ["charge", "main_credit", ...],
             ...
           },
           ...
-        ]
-    :return: ex: "mon.spark_ft_contract_snapshot.charge" si trouvé,
-             ou la valeur d'origine si pas trouvé.
+        ])
+
+    Returns:
+        str: The resolved column name. ex: "mon.spark_ft_contract_snapshot.charge" if founded, if not it returns the
+             the original value .
     """
+
+   
     # 1) Isoler le col_name (sans alias)
     # print("column_name",column_name)
     split_col = column_name.split(".")
-    #print("split_col",split_col)
-    #print("split_col:",split_col,"taille:",len(split_col))
+  
+   
     if len(split_col) == 2:
         # alias = 'a', col_name = 'CHARGE' (ex.)
         _, col_name = split_col
@@ -250,8 +291,8 @@ def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str
         col_name=column_name
         pass
 
-    # 2) Convertir en majuscules pour la comparaison
-
+    # 2) Recherche du nom du champs dans le dictionnaire où on table->liste_champs pour le fichier .hql en cours de traitement
+    # sinon on recherche dans le dictionnaire des table->liste champs créé à partir des requêtes CREATE TABLE 
     for table_name, fields in dic_path.items():
         fields_upper = [f.upper() for f in fields]
         col_name = col_name.strip('`"').upper()
