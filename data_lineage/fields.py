@@ -16,15 +16,6 @@ import hashlib
 _analysis_cache = {}
 
 def cache_analyze_projection(func):
-     """
-    Decorator to cache the results of SQL projection analysis.
-
-    Args:
-        func (function): The projection analysis function to decorate.
-
-    Returns:
-        function: The decorated function with caching logic.
-    """
     @wraps(func)
     def wrapper(projection, hql_content, results):
         hql_hash = hashlib.md5(hql_content.encode('utf-8')).hexdigest()
@@ -49,8 +40,9 @@ def cache_analyze_projection(func):
     return wrapper
 
 
+
 def extract_table_names(query):
-   """
+    """
     Searches for all occurrences of a clause of the type:
     FROM "schema"."table" AS "alias"
     and returns a list of table names in the format schema.table.
@@ -78,7 +70,7 @@ def extract_table_names(query):
     return list(table_names)
 
 def remove_comments(sql):
-       """
+    """
     Removes line and block comments from an SQL query.
 
     Args:
@@ -603,6 +595,78 @@ def create_dict_tables_dependencies_and_path(
     return dict_tables_dependencies
 
 
+def create_dict_tables_dependencies_and_path_for_hive_tables(
+    dict_table_paths: dict,
+    dic_hive_dependencies: dict,
+    dict_rdms_fields: dict
+) -> dict:
+    """
+    Crée un dictionnaire des dépendances de tables Hive et associe chaque dépendance à son fichier HQL.
+    
+    Args:
+        dict_table_paths (dict): Dictionnaire associant chaque table Hive à son fichier HQL.
+                                 Exemple: {"table_hive1": "chemin/vers/fichier1.hql", ...}
+        dic_hive_dependencies (dict): Dictionnaire des dépendances Hive -> Hive.
+                                      Exemple: {"hive_table": {"dependencies": ["hive_table1", "hive_table2"]}, ...}
+        dict_rdms_fields (dict): Dictionnaire associant une table RDMS à la liste de ses champs.
+                                 Exemple: {"rdms_table": ["champ1", "champ2", "champ3"], ...}
+    
+    Returns:
+        dict: Dictionnaire structuré sous la forme:
+              {
+                  "hive_table1": {
+                      "hive_table1": ["file1.hql"],
+                      "hive_table2": ["file2.hql"],
+                      "hive_table3": ["file3.hql"]
+                  },
+                  "hive_table2": {
+                      "hive_table2": ["file2.hql"],
+                      "hive_table4": ["file4.hql"]
+                  }
+              }
+    """
+    dict_tables_dependencies = {}
+
+    # Parcourir les dépendances hive -> Hive
+
+
+    for table, value in dic_hive_dependencies.items():
+        dict_tables_dependencies[table] = {}
+        dependencies = value.get('dependances', [])
+        
+        # Ajouter la table elle-même à ses dépendances
+        if table not in dict_tables_dependencies[table]:
+            dict_tables_dependencies[table][table] = []
+        
+        # Récupérer le fichier HQL associé à la table elle-même
+        file_self = dict_table_paths.get(table, None)
+        if file_self:
+            dict_tables_dependencies[table][table].append(file_self)
+
+        for dep in dependencies:
+            if dep not in dict_tables_dependencies[table]:
+                dict_tables_dependencies[table][dep] = []
+                
+            # Récupérer le fichier HQL associé à la table dépendante
+            file_dep = dict_table_paths.get(dep, None)
+            if file_dep:
+                dict_tables_dependencies[table][dep].append(file_dep)
+
+    # Convertir les listes de listes en listes simples
+    for table, deps in dict_tables_dependencies.items():
+        for dep, paths in deps.items():
+            # Aplatir les listes de listes en une seule liste
+            flat_list = []
+            for path in paths:
+                if isinstance(path, list):
+                    flat_list.extend(path)
+                else:
+                    flat_list.append(path)
+            dict_tables_dependencies[table][dep] = list(set(flat_list))
+
+    return dict_tables_dependencies
+
+
 def build_lineage(dependencies, results):
     """
     Construit le lignage des tables Hive à partir des fichiers HQL.
@@ -639,7 +703,7 @@ def build_lineage(dependencies, results):
 
 def track_fields_across_lineage(rdms_table_name,data, results):
     """
-    Suit les opérations menés sur les colonnes de la première à la dernière table pour chaque ligne de dépendances  
+    Suit les opérations menés sur les colonnes de la première à la dernière table pour chaque ligne de dépendances  pour une table rdms
 
     Args:
         data (dict): Dictionnaire contenant plusieurs tables RDMS et leurs informations :
@@ -701,6 +765,113 @@ def track_fields_across_lineage(rdms_table_name,data, results):
     return overall_field_tracking
 
 
+def track_fields_across_lineage_for_data_lake(data_lake_table, data, results, dic_hive_dependencies):
+    """
+    Suit les opérations menées sur les colonnes d'une table du datalake donnée pour chaque ligne de dépendances.
+    
+    Args:
+        data_lake_table (str): Le nom de la table du datalake à suivre.
+        data (dict): Dictionnaire contenant plusieurs tables RDMS et leurs informations :
+                     - "liste_champs" : Liste des champs à suivre
+                     - "dependencies" : Dictionnaire des tables Hive et leurs fichiers HQL associés
+        results (dict): Dictionnaire contenant des résultats intermédiaires pour l'analyse.
+        dic_hive_dependencies (dict): Dictionnaire des dépendances Hive -> Hive.
+                                      Exemple: {"hive_table": {"dependencies": ["hive_table1", "hive_table2"]}, ...}
+
+    Returns:
+        dict: Dictionnaire contenant le lignage des champs sous la forme :
+              {
+                  "champ1": [
+                      { "chemin_du_fichier.hql": "path/alors/exec.hql",
+                        "Opérations arithmétiques": ["+", "-", ...],
+                        "Formule SQL": "SELECT ... FROM ... WHERE ...",
+                        "Table(s) utilisées": ["table1", "table2"]},
+                      { ... }
+                  ],
+                  "champ2": [ ... ]
+              }
+    """
+    overall_field_tracking = {}
+
+    # Parcours du dictionnaire des tables RDMS et de leurs dépendances
+    for i, info in data.items():
+        # Recherche de la table du datalake en paramètre dans le dictionnaire
+        table_hive = info.get('first_hive table', None)
+        
+        # Cas où la table du datalake est trouvée dans la première dépendance
+        if table_hive and table_hive.lower() == data_lake_table.lower():
+            dependencies = info.get("dependencies", None)
+            if dependencies:
+                lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
+                overall_field_tracking.update(process_lineage(lineage))
+
+        else:
+            # Cas où la table Hive se trouve dans les autres dépendances
+            dependencies = info.get("dependencies", None)
+            if dependencies:
+                for dep, path in dependencies.items():
+                    if dep!=None:
+                        if dep.lower() == data_lake_table.lower():
+                            lineage = build_lineage(dependencies, results)
+                            overall_field_tracking.update(process_lineage(lineage))
+
+    # Si la table n'est pas trouvée dans le dictionnaire `data`, chercher dans `dic_hive_dependencies`
+    if not overall_field_tracking:
+        for table, value in dic_hive_dependencies.items():
+            if table.lower() == data_lake_table.lower():
+                if value!=None:
+                    lineage = build_lineage(value, results)
+                    overall_field_tracking.update(process_lineage(lineage))
+                    break
+
+    return overall_field_tracking
+
+def process_lineage(lineage):
+    """
+    Traite le lignage pour extraire les informations de suivi des champs.
+
+    Args:
+        lineage (dict): Dictionnaire des lignages où chaque clé est un fichier HQL et chaque valeur est
+                        le résultat de l'analyse par `create_lineage_dic`.
+
+    Returns:
+        dict: Dictionnaire contenant le suivi des champs.
+    """
+    field_tracking = {}
+
+    for hql_file, tables in lineage.items():
+        for table, details in tables.items():
+            for key, info in details.items():
+                detected_column = info.get("Colonnes détectées", None)
+                if not detected_column:  # Si aucune colonne détectée
+                    detected_column = "NO DETECTED COLUMN"
+                    if not detected_column:
+                        detected_column = "INCONNUE"
+
+                # Si c'est une liste, on la met en minuscule
+                if isinstance(detected_column, list):
+                    detected_column = [col.lower() for col in detected_column]
+                else:
+                    detected_column = detected_column.lower()
+
+                for col in detected_column if isinstance(detected_column, list) else [detected_column]:
+                    if col not in field_tracking:
+                        field_tracking[col] = []
+
+                    field_entry = {
+                        "path": hql_file,
+                        "colonne": col,
+                        "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
+                        "Alias": info.get("Alias/Projection", None),
+                        "Formule SQL": info.get("Formule SQL", ""),
+                        "Table(s) utilisées": info.get("Table(s) utilisées", "")
+                    }
+
+                    field_tracking[col].append(field_entry)
+
+    return field_tracking
+
+
 
 def export_tracking_lineage_to_excel(lineage_data, file_name):
     """
@@ -728,8 +899,6 @@ def export_tracking_lineage_to_excel(lineage_data, file_name):
     # Exporter vers Excel
     df.to_excel(file_name, index=False, engine="openpyxl")
     
-
-
 
 """
 
