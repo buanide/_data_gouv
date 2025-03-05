@@ -16,6 +16,29 @@ import hashlib
 _analysis_cache = {}
 
 def cache_analyze_projection(func):
+    """
+    Décorateur pour mettre en cache les résultats de l'analyse des projections SQL.
+
+    Ce décorateur utilise un cache pour stocker les résultats de l'analyse des projections SQL
+    afin d'éviter de recalculer les mêmes résultats pour les mêmes projections. Le cache est basé
+    sur un hachage MD5 du contenu HQL et de la projection SQL.
+
+    Args:
+        func (function): La fonction d'analyse de projection à décorer.
+
+    Returns:
+        function: La fonction décorée avec mise en cache.
+
+    Exemple:
+        @cache_analyze_projection
+        def analyze_projection(projection, hql_content, results):
+            # Analyse de la projection
+            ...
+
+    Notes:
+        - Le cache est stocké dans la variable `_analysis_cache`.
+        - Le hachage MD5 est utilisé pour générer des clés uniques pour le contenu HQL et les projections SQL.
+    """
     @wraps(func)
     def wrapper(projection, hql_content, results):
         hql_hash = hashlib.md5(hql_content.encode('utf-8')).hexdigest()
@@ -143,8 +166,7 @@ def extract_lineage_fields(hive_sql):
         # print(f"coloumn : {str(column).split('.')[1]} => source: {extract_table_names(str(root.sources[column.table]))}")
         # print("")
         # Retirer les guillemets du champ
-        # print("expre",str(column))
-        # print("champs",a)
+        
         for t in tables:
             # Si le nom de la table n'existe pas encore dans le dictionnaire,
             # on l'initialise à un set pour éviter les doublons.
@@ -248,7 +270,7 @@ def resolve_column_alias(column_name: str, dic_path: dict, results: dict) -> str
 
     Args:
         column_name (str): The name of the column to resolve.
-        dic_path (dict): Dictionary of tables and their fields for the current query.
+        dic_path (dict): Dictionary of tables and their fields for the current query, created from the HQL file using the 'extract_lineage_fields' function.
         results (dict): Dictionary of fields from CREATE TABLE queries. (results[file_path] = [
           {
             "table_name": "mon.spark_ft_contract_snapshot",
@@ -365,56 +387,6 @@ def analyze_projection(projection: exp.Expression, hql_content: str, results: di
     }
 
 
-"""
-def analyze_projection(projection: exp.Expression, hql_content: str, results: dict) -> dict:
-    
-    Analyse une projection pour extraire :
-      - columns_used : liste des colonnes (résolues si ambiguës) en minuscule
-      - aggregations : liste des fonctions d'agrégation
-      - arithmetic_ops : liste des opérations arithmétiques
-      - formula_sql : la reconstitution de la projection en SQL
-    
-
-    columns_used = []
-    dic_table_fields = extract_lineage_fields(hql_content)
-    for col in projection.find_all(exp.Column):
-        if col.db:
-            table_part = f"{col.db}.{col.table}" or ""
-        else:
-            table_part = col.table or ""
-
-        column_part = col.name
-        raw_column_name = f"{table_part}.{column_part}" if table_part else column_part
-        # print("raw_column_name",raw_column_name)
-       
-        # print("raw_column_name")
-        # Tenter de résoudre l'ambiguïté (ex. 'a.CHARGE' -> 'mon.spark_ft_contract_snapshot.charge')
-        resolved = resolve_column_alias(raw_column_name, dic_table_fields, results)
-        columns_used.append(resolved)
-
-    # Fonctions d'agrégation
-    agg_funcs = []
-    for func in projection.find_all(exp.AggFunc):
-        func_name = func.__class__.__name__.upper()
-        if isinstance(func, exp.Count) and func.is_star:
-            func_name = "COUNT(*)"
-        agg_funcs.append(func_name)
-
-    # Opérations arithmétiques
-    arithmetic_ops = []
-    ARITHMETIC_NODES = (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)
-    for node in projection.find_all(ARITHMETIC_NODES):
-        arithmetic_ops.append(type(node).__name__.upper())
-
-    formula_sql = projection.sql(dialect="hive")
-
-    return {
-        "columns_used": columns_used,
-        "aggregations": agg_funcs,
-        "arithmetic_ops": arithmetic_ops,
-        "formula_sql": formula_sql,
-    }
-"""
 
 def find_tables_in_select(select_expr: exp.Select) -> list:
     """
@@ -433,41 +405,38 @@ def find_tables_in_select(select_expr: exp.Select) -> list:
     return list(set(tables))
 
 
-def get_col_name_without_table(col_name: str) -> str:
-    """ """
-    # 1) Remove outer quotes
-    col_no_quotes = col_name.replace('"', "")
-    # e.g. "ft_contract_snapshot"."operator_code" -> ft_contract_snapshot.operator_code
-
-    # 2) Split on the first dot (if any)
-    parts = col_no_quotes.split(".", 1)
-    # e.g. ["ft_contract_snapshot", "operator_code"]
-    # print("parts",parts)
-    if len(parts) == 2:
-        return parts[1]
-    else:
-        return parts[0]
-
 
 def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
     """
-    Lit une requête HQL depuis un fichier,
-    parse et qualifie la requête, puis construit un dictionnaire
-    de la forme :
-      {
-        "<chemin_fichier>.hql": {
-          "ALIAS_OR_NAME": {
-            "Alias/Projection": ...,
-            "Colonnes détectées": [...],
-            "Fonctions d'agg": [...],
-            "Opérations arithmétiques": [...],
-            "Formule SQL": ...,
-            "Table(s) utilisées": ...
-          },
-          ...
-        }
-      }
-    """
+        Lit une requête HQL depuis un fichier, parse et qualifie la requête, puis construit un dictionnaire
+        de lignage des données.
+
+        Cette fonction analyse une requête HQL pour extraire les informations de lignage des données, telles que
+        les colonnes détectées, les fonctions d'agrégation, les opérations arithmétiques, la formule SQL et les
+        tables utilisées. Le résultat est structuré sous la forme d'un dictionnaire.
+
+        Args:
+            hql_file_path (str): Le chemin du fichier HQL à analyser.
+            results (dict): Dictionnaire contenant des résultats intermédiaires pour l'analyse, issu de la fonction 'process_hql_files' 
+
+        Returns:
+            dict: Dictionnaire des lignages où chaque clé est un fichier HQL et chaque valeur est un dictionnaire
+                contenant les informations de lignage des données. La structure est la suivante :
+                {
+                    "<chemin_fichier>.hql": {
+                        "ALIAS_OR_NAME": {
+                            "Alias/Projection": ...,
+                            "Colonnes détectées": [...],
+                            "Fonctions d'agg": [...],
+                            "Opérations arithmétiques": [...],
+                            "Formule SQL": ...,
+                            "Table(s) utilisées": ...
+                        },
+                        ...
+                    },
+                    ...
+                }
+        """
     lineage_dict = {}
     temp_projection=0
 
@@ -701,7 +670,7 @@ def build_lineage(dependencies, results):
                 pass
     return lineage
 
-def track_fields_across_lineage(rdms_table_name,data, results):
+def track_fields_across_lineage(rdms_table_name,data, results,dic_fields):
     """
     Suit les opérations menés sur les colonnes de la première à la dernière table pour chaque ligne de dépendances  pour une table rdms
 
@@ -725,43 +694,51 @@ def track_fields_across_lineage(rdms_table_name,data, results):
               }
     """
     overall_field_tracking = {}
+    # parcours du dictionnaire contenant le sinfos des tables rdms
     for i, info in data.items():
-        #liste_champs = table_data.get("liste_champs", [])
+        fields_first_hive_table = info.get("liste_champs", [])
         rdms=info.get('rdms_table')
+        for i,value in dic_fields.items():
+                table_name=value.get('table_name',None)
+                if table_name!=None and table_name.lower()==rdms.lower():
+                        fields_rdms=value.get('fields',None)
+        # Recherche de la table RDMS en paramètre dans le dictionnaire
         if rdms.lower()==rdms_table_name.lower():
             #print("ok")
             dependencies = info.get("dependencies",None)
             lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
             #print("lineage",lineage)
-            for hql_file, tables in lineage.items():
-                for table, details in tables.items():
-                    for key, info in details.items():
-                        detected_column = info.get("Colonnes détectées",None)
-                        if not detected_column:  # Si aucune colonne détectée
-                            detected_column = "NO DETECTED COLUMN"
-                            if not detected_column:
-                                detected_column = "INCONNUE"
+            if fields_rdms!=None:
+                for i in range(0,len(fields_rdms)): 
+                    for hql_file, tables in lineage.items():
+                        for table, details in tables.items():
+                            for key, info in details.items():
+                                detected_column = info.get("Colonnes détectées",None)
+                                if not detected_column:  # Si aucune colonne détectée
+                                    detected_column = "NO DETECTED COLUMN"
+                                    if not detected_column:
+                                        detected_column = "INCONNUE"
 
-                        # Si c'est une liste, on la met en minuscule
-                        if isinstance(detected_column, list):
-                            detected_column = [col.lower() for col in detected_column]
-                        else:
-                            detected_column = detected_column.lower()
+                                # Si c'est une liste, on la met en minuscule
+                                if isinstance(detected_column, list):
+                                    detected_column = [col.lower() for col in detected_column]
+                                else:
+                                    detected_column = detected_column.lower()
 
-                        for col in detected_column if isinstance(detected_column, list) else [detected_column]:
-                            if col not in overall_field_tracking:
-                                overall_field_tracking[col] = []
+                                for col in detected_column if isinstance(detected_column, list) else [detected_column]:
+                                    if col not in overall_field_tracking:
+                                        overall_field_tracking[col] = []
+                                    field_entry = {
+                                        "rdms_field":fields_rdms[i],
+                                        "path": hql_file,
+                                        "colonne": col,
+                                        "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
+                                        "Alias": info.get("Alias/Projection", None),
+                                        "Formule SQL": info.get("Formule SQL", ""),
+                                        "Table(s) utilisées": info.get("Table(s) utilisées", "")
+                                    }
 
-                            field_entry = {
-                                "path": hql_file,
-                                "colonne": col,
-                                "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
-                                "Alias": info.get("Alias/Projection", None),
-                                "Formule SQL": info.get("Formule SQL", ""),
-                                "Table(s) utilisées": info.get("Table(s) utilisées", "")
-                            }
-
-                            overall_field_tracking[col].append(field_entry)
+                                    overall_field_tracking[col].append(field_entry)
     return overall_field_tracking
 
 

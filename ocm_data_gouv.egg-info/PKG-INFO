@@ -7,6 +7,7 @@ Description-Content-Type: text/markdown
 Requires-Dist: openpyxl>=3.1.5
 Requires-Dist: pandas>=2.2.3
 Requires-Dist: regex>=2024.11.6
+Requires-Dist: sqlalchemy>=2.0.38
 Requires-Dist: sqlglot>=26.4.1
 Requires-Dist: sqllineage>=1.5.4
 Requires-Dist: sqlparse>=0.5.3
@@ -41,13 +42,13 @@ Errors explanations:
 - Locally:
      git clone https://github.com/tonpseudo/ma_librairie.git (you can also download the code and realize the following steps)
      uv venv
-     cd data_lineage
      uv pip install -e .
 
 
-3) modify the main.py to use function of the package or create your own .py file to use the function you need
+3) modify the demo.py to use function of the package or create your own .py file to use the function that you need
 
-You need elements for this code:
+4) to runthe code use: uv run <nom_fichier.py>
+You need some elements for this code:
 
 - the hdfs directory
 - the nifi flow file

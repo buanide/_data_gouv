@@ -1,6 +1,8 @@
 README.md
 pyproject.toml
 data_lineage/__init__.py
+data_lineage/clean.py
+data_lineage/data_sources.py
 data_lineage/fields.py
 data_lineage/format_json.py
 data_lineage/utils.py
