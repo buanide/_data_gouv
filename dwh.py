@@ -1,31 +1,55 @@
 from sqlalchemy import create_engine
+import oracledb
 import pandas as pd
+import json
+import time
 
-# Remplace par ton SGBD et tes informations de connexion
-DATABASE_TYPE = 'oracle'  # Ex: 'mysql', 'oracle', 'mssql'
-USERNAME = 'mon'
-PASSWORD = 'Mon123ocm#'
-HOST = '172.26.75.14'
-PORT = '20303'  # Ex: 1521 (Oracle), 1433 (SQL Server), 3306 (MySQL)
-DATABASE = 'OCMDWH'
+
+table_dict = {}
+connection = oracledb.connect(
+    user="mon", 
+    password="Mon123ocm#", 
+    dsn="172.26.75.14:20303/OCMDWH"
+)
 
 # Créer la connexion SQLAlchemy
-engine = create_engine(f"{DATABASE_TYPE}://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}")
+cursor = connection.cursor()
 
 # Charger la liste des tables (requête dépendant du SGBD)
-with engine.connect() as connection:
-    if DATABASE_TYPE == "postgresql":
-        query = "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"
-    elif DATABASE_TYPE == "mysql":
-        query = "SHOW TABLES;"
-    elif DATABASE_TYPE == "mssql":
-        query = "SELECT name FROM sys.tables;"
-    elif DATABASE_TYPE == "oracle":
-        query = "SELECT table_name FROM user_tables;"
-    else:
-        raise ValueError("SGBD non supporté.")
+a = input("Write OK if you want to update table information: ")
 
-    df = pd.read_sql(query, connection)
+query = """
+SELECT OWNER, TABLE_NAME, COLUMN_NAME
+FROM ALL_TAB_COLUMNS
+WHERE OWNER = 'MON' 
+ORDER BY OWNER, TABLE_NAME, COLUMN_ID
+"""
+if a.upper() == 'OK':
+    cursor.execute(query)
+    tables = cursor.fetchall()
+    df=pd.DataFrame(tables, columns=['OWNER', 'TABLE_NAME', 'COLUMN_NAME'])
 
-# Afficher la liste des tables
-print(df)
+else:
+    print("chargement des tables depuis le fichier parquet")
+
+    start_time = time.time()
+    df=pd.read_parquet('tables_mon_fields_description.parquet')
+
+for _, row in df.iterrows():
+    key = f"{row['OWNER']}.{row['TABLE_NAME']}"  
+    value = row['COLUMN_NAME'] 
+    if key not in table_dict:
+        table_dict[key] = []  
+
+    table_dict[key].append(value)  
+
+
+with open("tables_mon_fields_description_dict.json", "w", encoding="utf-8") as json_file:
+    json.dump(table_dict, json_file, indent=4, ensure_ascii=False)
+
+end=time.time()-start_time
+
+print("Temps d'exécution: ", end)
+
+#df.to_parquet('tables_mon_fields_description.parquet', index=False)
+

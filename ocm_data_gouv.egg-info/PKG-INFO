@@ -4,7 +4,9 @@ Version: 0.1.0
 Summary: Add your description here
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
+Requires-Dist: fastparquet>=2024.11.0
 Requires-Dist: openpyxl>=3.1.5
+Requires-Dist: oracledb>=3.0.0
 Requires-Dist: pandas>=2.2.3
 Requires-Dist: regex>=2024.11.6
 Requires-Dist: sqlalchemy>=2.0.38

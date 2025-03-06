@@ -5,7 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastparquet>=2024.11.0",
     "openpyxl>=3.1.5",
+    "oracledb>=3.0.0",
     "pandas>=2.2.3",
     "regex>=2024.11.6",
     "sqlalchemy>=2.0.38",

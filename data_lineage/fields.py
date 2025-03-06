@@ -670,6 +670,12 @@ def build_lineage(dependencies, results):
                 pass
     return lineage
 
+
+    """
+    table_rdms->champs_rdms
+    equivalent_hive->champs_hive
+    """
+
 def track_fields_across_lineage(rdms_table_name,data, results,dic_fields):
     """
     Suit les opérations menés sur les colonnes de la première à la dernière table pour chaque ligne de dépendances  pour une table rdms
@@ -698,11 +704,14 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields):
     for i, info in data.items():
         fields_first_hive_table = info.get("liste_champs", [])
         rdms=info.get('rdms_table')
+        fields_rdms=None
         for i,value in dic_fields.items():
                 table_name=value.get('table_name',None)
                 if table_name!=None and table_name.lower()==rdms.lower():
                         fields_rdms=value.get('fields',None)
         # Recherche de la table RDMS en paramètre dans le dictionnaire
+
+        print("champs rdms",fields_rdms)
         if rdms.lower()==rdms_table_name.lower():
             #print("ok")
             dependencies = info.get("dependencies",None)
