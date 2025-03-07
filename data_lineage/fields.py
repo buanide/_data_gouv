@@ -676,7 +676,7 @@ def build_lineage(dependencies, results):
     equivalent_hive->champs_hive
     """
 
-def track_fields_across_lineage(rdms_table_name,data, results,dic_fields):
+def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fields_from_dwh):
     """
     Suit les opérations menés sur les colonnes de la première à la dernière table pour chaque ligne de dépendances  pour une table rdms
 
@@ -704,14 +704,14 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields):
     for i, info in data.items():
         fields_first_hive_table = info.get("liste_champs", [])
         rdms=info.get('rdms_table')
+        #print('rmds_table',rdms)
         fields_rdms=None
-        for i,value in dic_fields.items():
-                table_name=value.get('table_name',None)
-                if table_name!=None and table_name.lower()==rdms.lower():
-                        fields_rdms=value.get('fields',None)
-        # Recherche de la table RDMS en paramètre dans le dictionnaire
-
-        print("champs rdms",fields_rdms)
+        
+        # Recherche de la table RDMS en paramètre dans le dictionn
+        for i,value in dic_fields_from_dwh.items():
+                if i.lower()==rdms.lower():
+                    fields_rdms=value
+        
         if rdms.lower()==rdms_table_name.lower():
             #print("ok")
             dependencies = info.get("dependencies",None)
@@ -737,6 +737,8 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields):
                                 for col in detected_column if isinstance(detected_column, list) else [detected_column]:
                                     if col not in overall_field_tracking:
                                         overall_field_tracking[col] = []
+
+                                    
                                     field_entry = {
                                         "rdms_field":fields_rdms[i],
                                         "path": hql_file,
