@@ -45,7 +45,7 @@ directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
 #liste_table=list(dic_table_fields.keys())
 #lineage_dic,_ = measure_execution_time(create_lineage_dic, path, create_table_dic)
 #export_lineage_to_excel(lineage_dic, "lineage_"+name_file+".xlsx")
-dict_fields_from_dwh=read_json(r"C:\Users\YBQB7360\Documents\Data gouvernance\ocm_data_gouv\tables_mon_fields_description_dict.json")
+dict_fields_from_dwh=read_json(r"C:\Users\YBQB7360\Documents\Data gouvernance\_data_gouv\tables_mon_fields_description_dict.json")
 
 dic_rdms_hive=extract_hive_table_and_queries(directory_conf)
 dict_table_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
@@ -79,7 +79,7 @@ for i,value in dict_tables_hive.items():
     break
 """
 #lineage_dic_for_one_chain_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
-table_name='MON.FT_GLOBAL_ACTIVITY_DAILY'
+table_name='MON.FT_A_DATA_TRANSFER'
 #lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage_for_data_lake,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_tables_hive)
 
 lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_tables_hive,dict_fields_from_dwh)

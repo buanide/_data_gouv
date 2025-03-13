@@ -671,10 +671,7 @@ def build_lineage(dependencies, results):
     return lineage
 
 
-    """
-    table_rdms->champs_rdms
-    equivalent_hive->champs_hive
-    """
+    
 
 def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fields_from_dwh):
     """
@@ -701,19 +698,22 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fie
     """
     overall_field_tracking = {}
     # parcours du dictionnaire contenant le sinfos des tables rdms
+
+
     for i, info in data.items():
         fields_first_hive_table = info.get("liste_champs", [])
         rdms=info.get('rdms_table')
         #print('rmds_table',rdms)
         fields_rdms=None
         
-        # Recherche de la table RDMS en paramètre dans le dictionn
+        # Recherche de la table RDMS en paramètre dans le dictionnaire et on récupère ses champs 
         for i,value in dic_fields_from_dwh.items():
                 if i.lower()==rdms.lower():
                     fields_rdms=value
-        
+                    break
+
+        #print("rdms_table_name",rdms_table_name)
         if rdms.lower()==rdms_table_name.lower():
-            #print("ok")
             dependencies = info.get("dependencies",None)
             lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
             #print("lineage",lineage)
@@ -873,6 +873,7 @@ def export_tracking_lineage_to_excel(lineage_data, file_name):
     for field, entries in lineage_data.items():
         for entry in entries:
             all_data.append({
+                "rdms_field":entry.get("rdms_field",""),
                 "Champ": entry.get("colonne", ""),
                 "Alias":entry.get("Alias",""),
                 "Chemin du fichier HQL": entry["path"],
@@ -881,7 +882,6 @@ def export_tracking_lineage_to_excel(lineage_data, file_name):
                 "Tables utilisées": entry.get("Table(s) utilisées", "")
             })
 
-    # Création du DataFrame
     df = pd.DataFrame(all_data)
     df= df.drop_duplicates()
     # Exporter vers Excel
