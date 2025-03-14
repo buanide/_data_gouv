@@ -706,19 +706,20 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fie
         #print('rmds_table',rdms)
         fields_rdms=None
         
-        # Recherche de la table RDMS en paramètre dans le dictionnaire et on récupère ses champs 
-        for i,value in dic_fields_from_dwh.items():
-                if i.lower()==rdms.lower():
-                    fields_rdms=value
-                    break
 
         #print("rdms_table_name",rdms_table_name)
         if rdms.lower()==rdms_table_name.lower():
             dependencies = info.get("dependencies",None)
             lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
             #print("lineage",lineage)
+            
+        # Recherche de la table RDMS en paramètre dans le dictionnaire et on récupère ses champs 
+            for i,value in dic_fields_from_dwh.items():
+                    if i.lower()==rdms.lower():
+                        fields_rdms=value
+                        break
+
             if fields_rdms!=None:
-                for i in range(0,len(fields_rdms)): 
                     for hql_file, tables in lineage.items():
                         for table, details in tables.items():
                             for key, info in details.items():
@@ -738,9 +739,36 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fie
                                     if col not in overall_field_tracking:
                                         overall_field_tracking[col] = []
 
-                                    
+                                    # on a besoin de connaitre à quel champ de la table rdms correspond le champ de la table hive
+                                    alias=info.get("Alias/Projection", None)
+                                    alias_upper=alias.upper()
+                                    if alias!=None:
+                                        # on regarde si l'alias est dans la liste des champs des champs
+                                        #  de dernière table d'aggrégatin avant l'insertion dans la table rdms
+                                        if  alias_upper in fields_first_hive_table:
+                                            try:
+                                               
+                                               # on se rassure que les deux listes de champs ont la même taille 
+                                        
+                                                if len(fields_rdms)==len(fields_first_hive_table):
+                                                     indice = fields_first_hive_table.index(alias_upper)  # 25 n'est pas dans la liste
+                                                     rdms_field=fields_rdms[indice]
+                                                     print("rdms_field",rdms_field)
+                                                     print("alias",alias)
+                                                     field_entry = {
+                                                        "path": "",
+                                                        "colonne": rdms_field,
+                                                        "Opérations arithmétiques": "",
+                                                        "Alias": alias,
+                                                        "Formule SQL": "",
+                                                        "Table(s) utilisées": ""
+                                                    }
+                                                     overall_field_tracking[col].append(field_entry)
+                                            except ValueError:
+                                                print("L'alias n'est pas dans la liste des champs de la table")
+
+                                           
                                     field_entry = {
-                                        "rdms_field":fields_rdms[i],
                                         "path": hql_file,
                                         "colonne": col,
                                         "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
@@ -873,7 +901,6 @@ def export_tracking_lineage_to_excel(lineage_data, file_name):
     for field, entries in lineage_data.items():
         for entry in entries:
             all_data.append({
-                "rdms_field":entry.get("rdms_field",""),
                 "Champ": entry.get("colonne", ""),
                 "Alias":entry.get("Alias",""),
                 "Chemin du fichier HQL": entry["path"],
