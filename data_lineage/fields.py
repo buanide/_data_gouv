@@ -703,6 +703,7 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fie
     for i, info in data.items():
         fields_first_hive_table = info.get("liste_champs", [])
         rdms=info.get('rdms_table')
+        first_hive_table=info.get('first_hive table')
         #print('rmds_table',rdms)
         fields_rdms=None
         
@@ -744,13 +745,17 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fie
                                     alias_upper=alias.upper()
                                     if alias!=None:
                                         # on regarde si l'alias est dans la liste des champs des champs
-                                        #  de dernière table d'aggrégatin avant l'insertion dans la table rdms
+                                        #  de dernière table d'aggrégation avant l'insertion dans la table rdms
                                         if  alias_upper in fields_first_hive_table:
-                                            try:
-                                               
+                                            #print("alias in fields_first_hive_table")
+                                            try:    
                                                # on se rassure que les deux listes de champs ont la même taille 
-                                        
+                                                print("rdms_table_name",rdms_table_name)
+                                                print("first_hive_table",first_hive_table)
+                                                print("fields_rdms taile",len(fields_rdms),"fields_first_hive_table taille",len(fields_first_hive_table))
+                                                #print()
                                                 if len(fields_rdms)==len(fields_first_hive_table):
+                                                     print("same size")
                                                      indice = fields_first_hive_table.index(alias_upper)  # 25 n'est pas dans la liste
                                                      rdms_field=fields_rdms[indice]
                                                      print("rdms_field",rdms_field)
@@ -766,8 +771,7 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fie
                                                      overall_field_tracking[col].append(field_entry)
                                             except ValueError:
                                                 print("L'alias n'est pas dans la liste des champs de la table")
-
-                                           
+                                          
                                     field_entry = {
                                         "path": hql_file,
                                         "colonne": col,
