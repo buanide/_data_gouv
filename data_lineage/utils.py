@@ -264,6 +264,8 @@ def extract_exec_queries(file_path: str) -> tuple:
     raw = None
     tt = None
     cdr = None
+    staging_table_dwh=None
+    table_dwh=None
 
     try:
         with open(file_path, "r") as file:
@@ -301,10 +303,19 @@ def extract_exec_queries(file_path: str) -> tuple:
                     if cdr:
                         cdr = cdr.upper()
 
+            match_tmp_staging = re.search(r'flux\.sqoop\.export-rdms\.staging-table\s*=\s*"([^"\n]+)"', content)
+            if match_tmp_staging:
+                staging_table_dwh = match_tmp_staging.group(1)
+                #print("Valeur extraite :", staging_table)
+        
+            match_rdms_table=re.search(r'flux\.sqoop\.export-rdms\.dest-table\s*=\s*"([^"\n]+)"',content)
+            if match_rdms_table:
+                table_dwh = match_rdms_table.group(1)
+
     except Exception as e:
         print(f"Erreur lors du traitement du fichier {file_path}: {e}")
 
-    return pre_exec_queries, exec_queries, raw, tt, cdr
+    return pre_exec_queries, exec_queries, raw, tt, cdr,staging_table_dwh,table_dwh
 
 
 def process_conf_files(directory: str, hdfs_directory: str) -> dict:
@@ -323,7 +334,7 @@ def process_conf_files(directory: str, hdfs_directory: str) -> dict:
     for root, dirs, files in os.walk(directory):
         for file in files:
             path = os.path.join(root, file)
-            pre_exec_queries, exec_queries, raw, tt, cdr = extract_exec_queries(path)
+            pre_exec_queries, exec_queries, raw, tt, cdr,staging_table_dwh,table_dwh = extract_exec_queries(path)
             paths_pre_exec_queries = []
             path_exec_queries = []
             if pre_exec_queries:
@@ -360,6 +371,8 @@ def process_conf_files(directory: str, hdfs_directory: str) -> dict:
                 "raw_directory": raw,
                 "tt_directory": tt,
                 "cdr_tt": cdr,
+                "staging_table_dwh":staging_table_dwh,
+                "dwh_table":table_dwh
             }
 
     return dic_conf_queries
@@ -511,7 +524,7 @@ def generate_dic_with_rdms_and_dependencies(
     Génère un dictionnaire avec les relations RDMS -> Hive et leurs dépendances Hive, jusqu'à ce qu'il n'y ait plus de dépendances directes.
     Args:
         results (dict): Dictionnaire contenant les associations RDMS et Hive.
-        dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.
+        dependency_map (dict): Dictionnaire des dépendances {table_hive: [dépendances]}.( issue de la fonction get_dir_dependances_2)
         output_file (str): Chemin du fichier Excel de sortie.
 
     retourne un dictionnaire de le forme:
@@ -967,6 +980,7 @@ def get_dir_dependances_2(dic_files_queries_paths: dict) -> dict:
         raw_path = queries.get("raw_directory", None)
         cdr_name = queries.get("cdr_tt", None)
         tt_directory=queries.get('tt_directory',None)
+        staging_dwh_table=queries.get('staging_table_dwh',None)
 
         # Traiter les requêtes 'exec'
         if queries["exec"]:
@@ -978,7 +992,8 @@ def get_dir_dependances_2(dic_files_queries_paths: dict) -> dict:
                             "dependances": set(),
                             "raw_directory": raw_path,
                             "cdr_name": cdr_name,
-                            "tt_directory":tt_directory
+                            "tt_directory":tt_directory,
+                            "staging_dwh_table":staging_dwh_table
                         }
                     dic[main_table]["dependances"].update(dependent_tables)
 
@@ -989,10 +1004,11 @@ def get_dir_dependances_2(dic_files_queries_paths: dict) -> dict:
                 if main_table:
                     if main_table not in dic:
                         dic[main_table] = {
-                            "dependances": set(),
+                           "dependances": set(),
                             "raw_directory": raw_path,
                             "cdr_name": cdr_name,
-                             "tt_directory":tt_directory
+                            "tt_directory":tt_directory,
+                            "staging_dwh_table":staging_dwh_table
                         }
                     dic[main_table]["dependances"].update(dependent_tables)
 

@@ -10,3 +10,45 @@ i 1 value {'rdms_table': 'MON.FT_A_CNI_EXPIREES',
  'TMP.TT_KYC_BDI_PP_ST2': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_BDI\\PP\\insert_into_kyc_bdi_pp_step2.hql'], 
  'TMP.TT_KYC_BDI_PP_ST1': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_BDI\\PP\\insert_into_kyc_bdi_pp_step1.hql'],
   'MON.SPARK_FT_MARKETING_DATAMART_MONTH': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\DATAMART\\FT_MARKETING_DATAMART_MONTH\\compute_and_insert_into_spark_ft_marketing_datamart_month.hql'], 'MON.SPARK_FT_MARKETING_DATAMART': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\DATAMART\\FT_MARKETING_DATAMART\\compute_and_insert_into_spark_ft_marketing_datamart.hql'], 'MON.SPARK_FT_CLIENT_360': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\CLIENT360\\compute_and_insert_into_spark_ft_client_360.hql'], 'MON.SPARK_FT_BDI': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_BDI_1A\\insert_into_spark_ft_bdi2.hql'], 'TMP.TT_FT_BDI_III_1A': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_BDI_1A\\insert_into_tt_ft_bdi_III2.hql'], 'TMP.TT_FT_BDI_II_1A': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_BDI_1A\\insert_into_tt_ft_bdi_II2.hql'], 'TMP.TT_FT_BDI_1A': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_BDI_1A\\insert_into_tt_ft_bdi2.hql'], 'CDR.SPARK_IT_BDI': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI\\IT_BDI\\insert_into_spark_it_bdi.hql', 'C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert2_into_spark_it_bdi.hql'], 'TMP.TT_KYC_PERS_PHY_B2C_ACTIVE': None, 'TMP.TT_KYC_PERS_PHY_B2C_FINAL': None, 'TMP.TT_KYC_PERS_PHY_B2C_COMPLETE': None, 'CDR.SPARK_IT_BDI_LIGNE_FLOTTE': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI\\IT_BDI_LIGNE_FLOTTE\\insert_into_spark_it_bdi_ligne_flotte.hql', 'C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert2_into_spark_it_bdi_ligne_flotte.hql', 'C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert_into_spark_it_bdi_flotte_multitism_generique.hql'], 'TMP.TT_BDI_LIGNE_FLOTTE2_1C': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert_into_tt_bdi_ligne_flotte2_1c.hql'], 'TMP.TT_BDI_LIGNE_FLOTTE2_1B': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert_into_tt_bdi_ligne_flotte2_1b.hql'], 'TMP.TT_BDI_LIGNE_FLOTTE2_1A': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert2_into_tt_bdi_ligne_flotte2.hql'], 'TMP.TT_BDI_FLOTTE_1A': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert2_into_tt_bdi_flotte.hql', 'C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert2_into_tt_bdi_flotte_1b.hql', 'C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert2_into_tt_bdi_flotte_plus.hql', 'C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert2_stk_flotte_into_tt_bdi_flotte.hql'], 'TMP.TT_BDI_1A': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert2_into_tt_bdi.hql'], 'TMP.TT_BDI_TMP1_1A': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\IT\\BDI2\\insert2_into_spark_remove_no_zsmart_to_bdi_tmp.hql'], 'MON.SPARK_FT_MSISDN_IMEI_LOCALISATION_TO_BDI': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_MSISDN_IMEI_LOCALISATION_TO_BDI\\insert_into_spark_ft_msisdn_imei_localisation_bdi.hql'], 'TMP.TT_LOCALISATION_BDI2': ['C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_MSISDN_IMEI_LOCALISATION_TO_BDI\\insert_into_tt_bdi_localisation2.hql'], 'DIM.SPARK_DT_OFFER_PROFILES': None, None: None}}
+
+
+
+-------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+  alias=info.get("Alias/Projection", None)
+                                    alias_upper=alias.upper()
+                                    if alias!=None:
+                                        # on regarde si l'alias est dans la liste des champs des champs
+                                        #  de dernière table d'aggrégation avant l'insertion dans la table rdms
+                                        if  alias_upper in fields_first_hive_table:
+                                            #print("alias in fields_first_hive_table")
+                                            try:    
+                                               # on se rassure que les deux listes de champs ont la même taille 
+                                                print("rdms_table_name",rdms_table_name)
+                                                print("fields_rdms taille",len(fields_rdms_tmp),"fields_rdms_temp taille",len(fields_rdms))
+                                                print("fields_rdms_temps ",fields_rdms_tmp)
+                                                print("")
+                                                print("fields_temps ",fields_rdms)
+                                                #print()
+                                                if len(fields_rdms_tmp)==len(fields_rdms):
+                                                     print("same size")
+                                                     indice = fields_first_hive_table.index(alias_upper)  # 25 n'est pas dans la liste
+                                                     rdms_field=fields_rdms[indice]
+                                                     print("rdms_field",rdms_field)
+                                                     print("alias",alias)
+                                                     field_entry = {
+                                                        "path": "",
+                                                        "colonne": rdms_field,
+                                                        "Opérations arithmétiques": "",
+                                                        "Alias": alias,
+                                                        "Formule SQL": "",
+                                                        "Table(s) utilisées": ""
+                                                    }
+                                                     overall_field_tracking[col].append(field_entry)
+                                            except ValueError:
+                                                print("L'alias n'est pas dans la liste des champs de la table")

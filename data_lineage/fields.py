@@ -498,7 +498,8 @@ def create_lineage_dic(hql_file_path: str, results: dict) -> dict:
 def create_dict_tables_dependencies_and_path(
     dict_table_paths: dict,
     dic_rdms_hive_dependencies: dict,
-    dict_rdms_fields: dict
+    dict_rdms_fields: dict,
+    dict_file_queries:dict
 ) -> dict:
     """
     Crée un dictionnaire des dépendances de tables RDMS et associe chaque dépendance à son fichier HQL.
@@ -510,7 +511,12 @@ def create_dict_tables_dependencies_and_path(
                                            Exemple: {"rdms_table": {"dependencies": ["hive_table1", "hive_table2"]}, ...}
         dict_rdms_fields (dict): Dictionnaire associant une table RDMS à la liste de ses champs.
                                  Exemple: {"rdms_table": ["champ1", "champ2", "champ3"], ...}
-    
+        dict_file_queries(dict): Dictionnaire contenant les infos associé à une table rdms
+
+        Exemple:{'pre_exec': [], 'exec': [], 'raw_directorirectory': None, 
+        'tt_directory': None, 'cdr_tt': None, 'staging_table_dwh': 'MON.SQ_TMP_SVI_APPEL_SELFCARE'}
+
+
     Returns:
         dict: Dictionnaire structuré sous la forme:
               {
@@ -535,6 +541,8 @@ def create_dict_tables_dependencies_and_path(
         second_dependency=None
          #on récupère la première dependance ton récupère ses champs
         first_dependency=None
+        staging_table_dwh=None
+        dwh_table=None
         second_dependency=dependencies[1]
         first_dependency=dependencies[0]
         
@@ -544,17 +552,26 @@ def create_dict_tables_dependencies_and_path(
                 if table_name!=None and table_name==second_dependency:
                         fields=value.get('fields',[])
                         
+        for i,value in dict_file_queries.items():
+            dwh_table=value.get('dwh_table')
+            if dwh_table!=None:
+                #print("dwh_table",dwh_table)
+                if first_dependency.upper()==dwh_table.upper():
+                    staging_table_dwh=value.get("staging_table_dwh",None)
+                    break
+                   
 
+        
          # Initialisation de l'entrée pour cette table RDMS
         dict_tables_dependencies[rdms] = {
             "rdms_table":first_dependency,
             "first_hive table":second_dependency,
             "liste_champs": fields,  # Récupération des champs RDMS
+            "staging_table_dwh":staging_table_dwh,
             "dependencies": {}
         }
         for dep in range(0,len(dependencies)):
             # Récupérer le fichier HQL associé à la table dépendante
-
             # on stocke les informations de toutes les autres tables dependantes
             if dep >0:
                 # récupération paths 
@@ -673,7 +690,7 @@ def build_lineage(dependencies, results):
 
     
 
-def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fields_from_dwh):
+def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dwh):
     """
     Suit les opérations menés sur les colonnes de la première à la dernière table pour chaque ligne de dépendances  pour une table rdms
 
@@ -703,24 +720,31 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fie
     for i, info in data.items():
         fields_first_hive_table = info.get("liste_champs", [])
         rdms=info.get('rdms_table')
+        tmp_dwh=info.get('staging_table_dwh',None)
         first_hive_table=info.get('first_hive table')
         #print('rmds_table',rdms)
-        fields_rdms=None
+        fields_rdms_tmp=None
         
-
         #print("rdms_table_name",rdms_table_name)
         if rdms.lower()==rdms_table_name.lower():
             dependencies = info.get("dependencies",None)
             lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
             #print("lineage",lineage)
             
-        # Recherche de la table RDMS en paramètre dans le dictionnaire et on récupère ses champs 
+        # Recherche des champs de la table temporaire et rdms finale dans le dictionnaire en paramètre dans le dictionnaire et on récupère ses champs 
             for i,value in dic_fields_from_dwh.items():
+                    if i.lower()==tmp_dwh.lower():
+                        fields_rdms_tmp=value
+                        print("rdms_temp_fields",fields_rdms_tmp)
+
                     if i.lower()==rdms.lower():
                         fields_rdms=value
-                        break
 
-            if fields_rdms!=None:
+                    if fields_rdms_tmp!=None and fields_rdms!=None:
+                        break
+                        
+
+            if fields_rdms_tmp!=None:
                     for hql_file, tables in lineage.items():
                         for table, details in tables.items():
                             for key, info in details.items():
@@ -740,23 +764,28 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields,dic_fie
                                     if col not in overall_field_tracking:
                                         overall_field_tracking[col] = []
 
-                                    # on a besoin de connaitre à quel champ de la table rdms correspond le champ de la table hive
+                                    # on a besoin de connaitre à quel champ de la table temporaire au dwh correspond le champ de la table du datalake
                                     alias=info.get("Alias/Projection", None)
                                     alias_upper=alias.upper()
+                                    print("fields_rdms_tmp",fields_rdms_tmp)
                                     if alias!=None:
                                         # on regarde si l'alias est dans la liste des champs des champs
                                         #  de dernière table d'aggrégation avant l'insertion dans la table rdms
-                                        if  alias_upper in fields_first_hive_table:
-                                            #print("alias in fields_first_hive_table")
+                                        
+                                        if  alias_upper in fields_rdms_tmp:
+                                            print("alias in fields_first_hive_table",alias_upper)
+                                            print("field",fields_rdms_tmp)
                                             try:    
                                                # on se rassure que les deux listes de champs ont la même taille 
                                                 print("rdms_table_name",rdms_table_name)
-                                                print("first_hive_table",first_hive_table)
-                                                print("fields_rdms taile",len(fields_rdms),"fields_first_hive_table taille",len(fields_first_hive_table))
+                                                print("fields_rdms taille",len(fields_rdms_tmp),"fields_rdms_temp taille",len(fields_rdms))
+                                                print("fields_rdms_temps ",fields_rdms_tmp)
+                                                print("")
+                                             
                                                 #print()
-                                                if len(fields_rdms)==len(fields_first_hive_table):
+                                                if len(fields_rdms_tmp)==len(fields_rdms):
                                                      print("same size")
-                                                     indice = fields_first_hive_table.index(alias_upper)  # 25 n'est pas dans la liste
+                                                     indice = fields_rdms_tmp.index(alias_upper)  # 25 n'est pas dans la liste
                                                      rdms_field=fields_rdms[indice]
                                                      print("rdms_field",rdms_field)
                                                      print("alias",alias)

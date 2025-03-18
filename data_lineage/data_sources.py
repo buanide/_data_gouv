@@ -32,6 +32,7 @@ def data_sources_lineage(root_dir:str,scripts_dir:str,directory_conf:str,nifi_fl
     #dic_nifi_flow_file = read_json(nifi_flow_file)
     dic_files_queries_paths = process_conf_files(directory_conf, root_dir)
     # dic table hive -> dependances
+    
     dic_tables_dependances = get_dir_dependances_2(dic_files_queries_paths)
     # table datawarehouse ->equivalent datalake
     dic_rdms_hive = extract_hive_table_and_queries(directory_conf)
@@ -43,3 +44,6 @@ def data_sources_lineage(root_dir:str,scripts_dir:str,directory_conf:str,nifi_fl
     list_dic = structure_dic(dic_process_group, dic_dependencies)
     generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,list_table_dwh)
 
+    
+
+    
