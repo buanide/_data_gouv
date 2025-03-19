@@ -75,7 +75,6 @@ for i,value in dict_tables_dependencies_and_fields.items():
     print(dependencies)
     break
 
-
 print("dict_tables_hive")
 for i,value in dict_tables_hive.items():
     print("i",i,"value",value)
@@ -84,11 +83,10 @@ for i,value in dict_tables_hive.items():
 #lineage_dic_for_one_chain_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
 table_name='MON.FT_A_DATA_TRANSFER'
 #lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage_for_data_lake,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_tables_hive)
-
 lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_fields_from_dwh)
 
 #print("lineage_fields_across_dependencies",lineage_fields_across_dependencies)
-#export_tracking_lineage_to_excel(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
+export_tracking_lineage_to_excel(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
 #dict_tables_hql_from_request_lineage=get_hql_path_from_table_name(dict_table_paths,list_table_from_hql)
 #print(dict_tables_hql_from_request_lineage)
 #nom="MON.FT_CONTRACT_SNAPSHOT"

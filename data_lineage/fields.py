@@ -727,8 +727,10 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
         
         #print("rdms_table_name",rdms_table_name)
         if rdms.lower()==rdms_table_name.lower():
+            # on extrait les dependences du datalake des tables rdms
             dependencies = info.get("dependencies",None)
-            lineage = build_lineage(dependencies, results)  # Extraction du lignage pour cette table
+            lineage = build_lineage(dependencies, results)  # Extraction du dictionnaire de lineag epour cette table
+            # pour chaque fichier hql correspondant à l'alimentation d'une table on a besoin des informations sur chacun des champs de cette table sous forme d'un dictionnaire
             #print("lineage",lineage)
             
         # Recherche des champs de la table temporaire et rdms finale dans le dictionnaire en paramètre dans le dictionnaire et on récupère ses champs 
@@ -745,6 +747,7 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                         
 
             if fields_rdms_tmp!=None:
+                    # 
                     for hql_file, tables in lineage.items():
                         for table, details in tables.items():
                             for key, info in details.items():
@@ -767,31 +770,32 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                                     # on a besoin de connaitre à quel champ de la table temporaire au dwh correspond le champ de la table du datalake
                                     alias=info.get("Alias/Projection", None)
                                     alias_upper=alias.upper()
-                                    print("fields_rdms_tmp",fields_rdms_tmp)
+                                    #print("fields_rdms_tmp",fields_rdms_tmp)
                                     if alias!=None:
                                         # on regarde si l'alias est dans la liste des champs des champs
                                         #  de dernière table d'aggrégation avant l'insertion dans la table rdms
                                         
                                         if  alias_upper in fields_rdms_tmp:
-                                            print("alias in fields_first_hive_table",alias_upper)
-                                            print("field",fields_rdms_tmp)
+                                            #print("alias in fields_first_hive_table",alias_upper)
+                                            #print("field",fields_rdms_tmp)
                                             try:    
                                                # on se rassure que les deux listes de champs ont la même taille 
-                                                print("rdms_table_name",rdms_table_name)
-                                                print("fields_rdms taille",len(fields_rdms_tmp),"fields_rdms_temp taille",len(fields_rdms))
-                                                print("fields_rdms_temps ",fields_rdms_tmp)
-                                                print("")
+                                                #print("rdms_table_name",rdms_table_name)
+                                                #print("fields_rdms taille",len(fields_rdms_tmp),"fields_rdms_temp taille",len(fields_rdms))
+                                                #print("fields_rdms_temps ",fields_rdms_tmp)
+                                                #print("")
                                              
                                                 #print()
                                                 if len(fields_rdms_tmp)==len(fields_rdms):
-                                                     print("same size")
+                                                     #print("same size")
                                                      indice = fields_rdms_tmp.index(alias_upper)  # 25 n'est pas dans la liste
                                                      rdms_field=fields_rdms[indice]
-                                                     print("rdms_field",rdms_field)
-                                                     print("alias",alias)
+                                                     #print("rdms_field",rdms_field)
+                                                     #print("alias",alias)
                                                      field_entry = {
+                                                        "rdms_field":rdms_field,
                                                         "path": "",
-                                                        "colonne": rdms_field,
+                                                        "colonne": "",
                                                         "Opérations arithmétiques": "",
                                                         "Alias": alias,
                                                         "Formule SQL": "",
@@ -802,6 +806,7 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                                                 print("L'alias n'est pas dans la liste des champs de la table")
                                           
                                     field_entry = {
+                                        "rdms_field":"",
                                         "path": hql_file,
                                         "colonne": col,
                                         "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
@@ -934,12 +939,13 @@ def export_tracking_lineage_to_excel(lineage_data, file_name):
     for field, entries in lineage_data.items():
         for entry in entries:
             all_data.append({
+                "Tables utilisées": entry.get("Table(s) utilisées", ""),
+                "dwh_fields": entry.get("rdms_field", ""),
                 "Champ": entry.get("colonne", ""),
                 "Alias":entry.get("Alias",""),
                 "Chemin du fichier HQL": entry["path"],
                 "Opérations arithmétiques": ", ".join(entry["Opérations arithmétiques"]),
-                "Formule SQL": entry["Formule SQL"],
-                "Tables utilisées": entry.get("Table(s) utilisées", "")
+                "Formule SQL": entry["Formule SQL"]     
             })
 
     df = pd.DataFrame(all_data)
