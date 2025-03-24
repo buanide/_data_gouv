@@ -744,7 +744,6 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
 
                     if fields_rdms_tmp!=None and fields_rdms!=None:
                         break
-                        
 
             if fields_rdms_tmp!=None:
                     # 
@@ -773,19 +772,11 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                                     #print("fields_rdms_tmp",fields_rdms_tmp)
                                     if alias!=None:
                                         # on regarde si l'alias est dans la liste des champs des champs
-                                        #  de dernière table d'aggrégation avant l'insertion dans la table rdms
-                                        
+                                        #  de dernière table d'aggrégation avant l'insertion dans la table rdms     
                                         if  alias_upper in fields_rdms_tmp:
-                                            #print("alias in fields_first_hive_table",alias_upper)
-                                            #print("field",fields_rdms_tmp)
                                             try:    
                                                # on se rassure que les deux listes de champs ont la même taille 
-                                                #print("rdms_table_name",rdms_table_name)
-                                                #print("fields_rdms taille",len(fields_rdms_tmp),"fields_rdms_temp taille",len(fields_rdms))
-                                                #print("fields_rdms_temps ",fields_rdms_tmp)
-                                                #print("")
-                                             
-                                                #print()
+                                              
                                                 if len(fields_rdms_tmp)==len(fields_rdms):
                                                      #print("same size")
                                                      indice = fields_rdms_tmp.index(alias_upper)  # 25 n'est pas dans la liste
@@ -804,16 +795,27 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                                                      overall_field_tracking[col].append(field_entry)
                                             except ValueError:
                                                 print("L'alias n'est pas dans la liste des champs de la table")
-                                          
-                                    field_entry = {
-                                        "rdms_field":"",
-                                        "path": hql_file,
-                                        "colonne": col,
-                                        "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
-                                        "Alias": info.get("Alias/Projection", None),
-                                        "Formule SQL": info.get("Formule SQL", ""),
-                                        "Table(s) utilisées": info.get("Table(s) utilisées", "")
-                                    }
+
+                                    if rdms_field!=None:
+                                        field_entry = {
+                                            "rdms_field":rdms_field,
+                                            "path": hql_file,
+                                            "colonne": col,
+                                            "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
+                                            "Alias": info.get("Alias/Projection", None),
+                                            "Formule SQL": info.get("Formule SQL", ""),
+                                            "Table(s) utilisées": info.get("Table(s) utilisées", "")
+                                        }
+                                    else:
+                                        field_entry = {
+                                            "rdms_field":"",
+                                            "path": hql_file,
+                                            "colonne": col,
+                                            "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
+                                            "Alias": info.get("Alias/Projection", None),
+                                            "Formule SQL": info.get("Formule SQL", ""),
+                                            "Table(s) utilisées": info.get("Table(s) utilisées", "")
+                                        }
 
                                     overall_field_tracking[col].append(field_entry)
     return overall_field_tracking
