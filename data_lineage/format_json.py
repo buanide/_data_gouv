@@ -292,7 +292,7 @@ def create_scheduled_group_dict(data_dict: dict, search_key: str, search_value: 
                     variables = extract_variables(result, "variables")
                     # print("variables type",variables)
                     staging,rep_raw,subdir_names,port,flux_name,ip_adress,username,= get_values_variables(variables)
-                    # print("serveur",staging,"raw",rep_raw,"subdir",subdir_names,"port",port,"flux_name",flux_name)
+                    print("serveur",staging,"raw",rep_raw,"subdir",subdir_names,"port",port,"flux_name",flux_name)
 
                 if "processors" in result.keys():
                     processors = result.get("processors", None)

@@ -29,7 +29,7 @@ def data_sources_lineage(root_dir:str,scripts_dir:str,directory_conf:str,nifi_fl
 
     scripts_dir = os.path.normpath(scripts_dir)
     #exemple de fichier nifi json
-    #dic_nifi_flow_file = read_json(nifi_flow_file)
+    dic_nifi_flow_file = read_json(nifi_flow_file)
     dic_files_queries_paths = process_conf_files(directory_conf, root_dir)
     # dic table hive -> dependances
     
@@ -37,10 +37,11 @@ def data_sources_lineage(root_dir:str,scripts_dir:str,directory_conf:str,nifi_fl
     # table datawarehouse ->equivalent datalake
     dic_rdms_hive = extract_hive_table_and_queries(directory_conf)
     # dependance dwh -> dependencies till raw of the project hdfs
-    dic_dependencies = generate_dic_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependances, "dependencies_with_raw.xlsx")
+    dic_dependencies = generate_dic_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependances)
     search_key = "componentType"
     search_value = "PROCESS_GROUP"
-    dic_process_group = create_scheduled_group_dict(nifi_flow_file, search_key, search_value)
+    dic_process_group = create_scheduled_group_dict(dic_nifi_flow_file, search_key, search_value)
+    #print("dic_process_group",list(dic_process_group.values())[0])
     list_dic = structure_dic(dic_process_group, dic_dependencies)
     generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,list_table_dwh)
 
