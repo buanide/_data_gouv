@@ -795,27 +795,29 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                                                      overall_field_tracking[col].append(field_entry)
                                             except ValueError:
                                                 print("L'alias n'est pas dans la liste des champs de la table")
-
-                                    if rdms_field!=None:
-                                        field_entry = {
-                                            "rdms_field":rdms_field,
-                                            "path": hql_file,
-                                            "colonne": col,
-                                            "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
-                                            "Alias": info.get("Alias/Projection", None),
-                                            "Formule SQL": info.get("Formule SQL", ""),
-                                            "Table(s) utilisées": info.get("Table(s) utilisées", "")
-                                        }
-                                    else:
-                                        field_entry = {
-                                            "rdms_field":"",
-                                            "path": hql_file,
-                                            "colonne": col,
-                                            "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
-                                            "Alias": info.get("Alias/Projection", None),
-                                            "Formule SQL": info.get("Formule SQL", ""),
-                                            "Table(s) utilisées": info.get("Table(s) utilisées", "")
-                                        }
+                                        
+                                        formule=info.get("Formule SQL", "")
+                                        if col in formule:
+                                            if rdms_field!=None:
+                                                field_entry = {
+                                                    "rdms_field":rdms_field,
+                                                    "path": hql_file,
+                                                    "colonne": col,
+                                                    "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
+                                                    "Alias": info.get("Alias/Projection", None),
+                                                    "Formule SQL": info.get("Formule SQL", ""),
+                                                    "Table(s) utilisées": info.get("Table(s) utilisées", "")
+                                                }
+                                            else:
+                                                field_entry = {
+                                                    "rdms_field":"",
+                                                    "path": hql_file,
+                                                    "colonne": col,
+                                                    "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
+                                                    "Alias": info.get("Alias/Projection", None),
+                                                    "Formule SQL": info.get("Formule SQL", ""),
+                                                    "Table(s) utilisées": info.get("Table(s) utilisées", "")
+                                                }
 
                                     overall_field_tracking[col].append(field_entry)
     return overall_field_tracking
