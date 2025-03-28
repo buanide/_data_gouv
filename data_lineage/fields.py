@@ -767,6 +767,7 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                                     alias=info.get("Alias/Projection", None)
                                     alias_upper=alias.upper()
                                     #print("fields_rdms_tmp",fields_rdms_tmp)
+                                    previous_entry = None
                                     if alias!=None:
                                         # on regarde si l'alias est dans la liste des champs des champs
                                         #  de dernière table d'aggrégation avant l'insertion dans la table rdms     
@@ -964,19 +965,77 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
         lineage_data (dict): Résultat de `track_fields_across_lineage`
         file_name (str): Nom du fichier Excel de sortie (par défaut "lineage_tracking.xlsx")
     """
+    dict_data = {}  # Dictionnaire pour stocker les données regroupées par dwh_fields
+
+    # Construire le dictionnaire regroupé par dwh_fields
+    for field, entries in lineage_data.items():
+        for entry in entries:
+            dwh_field = entry.get("rdms_field", "")
+            if dwh_field not in dict_data:
+                dict_data[dwh_field] = []
+
+            # Ajouter la première entrée sans condition
+            if not dict_data[dwh_field]:
+                dict_data[dwh_field].append(entry)
+            else:
+                # Vérifier si l'alias ou le champ de l'entrée précédente est dans la formule SQL de l'entrée courante
+                previous_entry = dict_data[dwh_field][-1]
+                previous_field = previous_entry.get("colonne", "")
+                previous_alias = previous_entry.get("Alias", "")
+                current_formula = entry.get("Formule SQL", "")
+
+                if previous_field in current_formula or previous_alias in current_formula:
+                    dict_data[dwh_field].append(entry)
+
+    # Construire une liste pour le DataFrame
+    all_data = []
+    for dwh_field, entries in dict_data.items():
+        # Ajouter une colonne pour le numéro de l'étape
+        unique_paths = list({entry["path"] for entry in entries if entry["path"]})
+        total_steps = len(unique_paths) + 1  # Ajouter 1 pour les entrées sans chemin
+        step_mapping = {path: total_steps - i for i, path in enumerate(unique_paths, start=1)}
+        step_mapping[""] = 1  # La dernière étape est pour les entrées sans chemin
+
+        for entry in entries:
+            entry["Étape"] = step_mapping.get(entry["path"], 1)
+            all_data.append(entry)
+
+    # Convertir en DataFrame
+    df = pd.DataFrame(all_data)
+
+    # Exporter vers Excel
+    #df = df.drop_duplicates()
+    df.to_excel(file_name, index=False, engine="openpyxl")
+    
+
+
+def export_tracking_lineage_to_excel_23(lineage_data, file_name):
+    """
+    Exporte le lineage des champs sous forme d'un fichier Excel, en regroupant par dwh_fields
+    et en ajoutant une colonne pour le numéro de l'étape de transformation.
+
+    Args:
+        lineage_data (dict): Résultat de `track_fields_across_lineage`
+        file_name (str): Nom du fichier Excel de sortie (par défaut "lineage_tracking.xlsx")
+    """
     all_data = []
     previous_entry = None  # Variable pour stocker l'entrée précédente
     # Construire la liste initiale
     for field, entries in lineage_data.items():
+        list_entries=[]
         for entry in entries:
              # Vérifier si l'entrée précédente existe et si le champ ou l'alias est présent dans l'entrée actuelle
             if previous_entry!=None:
-                previous_field = previous_entry.get("Champ", "")
+                previous_field = previous_entry.get("colonne", "")
                 previous_alias = previous_entry.get("Alias", "")
                 current_formula = entry.get("Formule SQL", "")
 
                 if previous_field not in current_formula and previous_alias not in current_formula:
                     continue  # Passer à l'entrée suivante si aucune correspondance n'est trouvée
+            else:# Si c'est la première entrée, on l'ajoute directement
+                if entry.get("colonne") == "":
+                    previous_entry = entry
+                continue
 
             # Ajouter l'entrée à la liste all_data
             all_data.append({
@@ -994,7 +1053,6 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
 
     # Convertir en DataFrame pour faciliter le traitement
     df = pd.DataFrame(all_data)
-
     # Grouper par dwh_fields
     grouped = df.groupby("dwh_fields")
 
@@ -1021,7 +1079,6 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
     # Exporter vers Excel
     df = df.drop_duplicates()
     df.to_excel(file_name, index=False, engine="openpyxl")
-    
 
 """
 

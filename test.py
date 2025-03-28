@@ -33,7 +33,7 @@ from data_lineage.fields import export_tracking_lineage_to_excel
 from data_lineage.utils import display_table_dependencies_2
 from data_lineage.format_json import read_json
 from data_lineage.data_sources import data_sources_lineage
-from data_lineage.fields import export_tracking_lineage_to_excel_2
+from data_lineage.fields import export_tracking_lineage_to_excel_23
 
 # Démarrer le chronomètre
 path=r"C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_BDI_AMELIORE\\insert_into_spark_ft_bdi_ameliore.hql"
@@ -92,7 +92,7 @@ lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_
 
 #print("lineage_fields_across_dependencies",lineage_fields_across_dependencies)
 #export_tracking_lineage_to_excel(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
-export_tracking_lineage_to_excel_2(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
+export_tracking_lineage_to_excel_23(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
 #dict_tables_hql_from_request_lineage=get_hql_path_from_table_name(dict_table_paths,list_table_from_hql)
 #print(dict_tables_hql_from_request_lineage)
 #nom="MON.FT_CONTRACT_SNAPSHOT"
