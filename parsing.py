@@ -1,6 +1,5 @@
-import ast
+from data_lineage.format_json import to_format_file
 
-source_code = "3 + 4"
-tree = ast.parse(source_code, mode='eval')
-
-print(ast.dump(tree))
+path=r"C:\Users\dokie\Downloads\PRODv2.0\PRODv2.0.json"
+ouptut=r"C:\Users\dokie\Downloads\output.json"
+to_format_file(path,ouptut)

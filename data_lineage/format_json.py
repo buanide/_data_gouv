@@ -2,6 +2,7 @@ import json
 import pandas as pd
 
 
+
 def create_excel_from_dict(dc_info_process_group, output_file):
     """
     Crée un fichier Excel à partir d'un dictionnaire où chaque ligne est unique par `subdir`.
@@ -62,6 +63,22 @@ def to_format(input_file):
     
     return data 
 
+def to_format_file(input_file, output_file):
+    """
+    Lit un fichier JSON et enregistre son contenu sous forme de JSON formaté avec une indentation de 4 espaces.
+    
+    Paramètres:
+        input_file (str): Chemin du fichier JSON à lire.
+        output_file (str): Chemin du fichier où enregistrer le JSON formaté.
+    
+    Retourne:
+        None
+    """
+    with open(input_file, "r", encoding="utf-8") as infile:
+        data = json.load(infile)  # Charger le JSON
+    
+    with open(output_file, "w", encoding="utf-8") as outfile:
+        json.dump(data, outfile, indent=4, ensure_ascii=False)   # Retourner un JSON formaté
 
 # Fonction pour extraire les dictionnaires avec la clé "variables"
 
@@ -86,12 +103,6 @@ def read_json(input_file):
         return None
 
 
-# Chemin du fichier JSON
-input_file = r"C:\Users\YBQB7360\Documents\fichier_formate.json"
-# output_file=r"C:\Users\YBQB7360\Documents\Data gouvernance\ocm_data_gouv\schema_flow_file_form.json"
-# to_format(input_file,output_file)
-# Lecture du fichier JSON et stockage dans un dictionnaire
-data_dict = read_json(input_file)
 
 
 def generate_json_schema(data):
@@ -181,6 +192,11 @@ def extract_dict_from_key(data, search_key):
 
 
 def get_values_variables(data):
+    """
+    data(dict): dictionnaire de variables
+    permet de récupérer les valeurs des variables d'un process group
+
+    """
     staging = None
     rep_raw = None
     subdir_names = None
@@ -188,6 +204,8 @@ def get_values_variables(data):
     flux_name = None
     ip_adress = None
     username = None
+    filename_contents_subdir=None
+    filenames_regex=None
     for idx, variables in enumerate(data, start=1):
         # print(f"Clé 'variables' #{idx}:")
         if "flux.sftp.remote-path" in variables.keys():
@@ -216,7 +234,14 @@ def get_values_variables(data):
         if "flux.sftp.username" in variables.keys():
             username = variables.get("flux.sftp.username", None)
 
-    return staging, rep_raw, subdir_names, port, flux_name, ip_adress, username
+        if "flux.hdfs.filename-contents-subdir" in variables.keys():
+            filename_contents_subdir=variables.get("filename_contents_subdir",None)
+
+        if "flux.filenames-regex" in variables.keys():
+            filenames_regex=variables.get("flux.filenames-regex",None)
+
+
+    return staging, rep_raw, subdir_names, port, flux_name, ip_adress, username,filename_contents_subdir,filenames_regex
 
 
 def create_dic_identifier(data_dict: dict, key: str):
@@ -291,8 +316,8 @@ def create_scheduled_group_dict(data_dict: dict, search_key: str, search_value: 
                     # print("componentType",componentType)
                     variables = extract_variables(result, "variables")
                     # print("variables type",variables)
-                    staging,rep_raw,subdir_names,port,flux_name,ip_adress,username,= get_values_variables(variables)
-                    print("serveur",staging,"raw",rep_raw,"subdir",subdir_names,"port",port,"flux_name",flux_name)
+                    staging,rep_raw,subdir_names,port,flux_name,ip_adress,username,filename_contents_subdir,filenames_regex= get_values_variables(variables)
+                    #print("serveur",staging,"raw",rep_raw,"subdir",subdir_names,"port",port,"flux_name",flux_name)
 
                 if "processors" in result.keys():
                     processors = result.get("processors", None)
@@ -347,6 +372,7 @@ def create_scheduled_group_dict(data_dict: dict, search_key: str, search_value: 
                         "username": username,
                         "name": name,
                         "nb_list_disabled": nb_list_disabled,
+                        "regex":filenames_regex
                     }
 
     else:
@@ -469,6 +495,7 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                     nb_processors = elements.get("nb_processors", 0)
                     nb_disabled_processors = elements.get("nb_disabled", 0)
                     nb_list_processors_disabled = elements.get("nb_list_disabled")
+                    regex=elements.get("regex")
 
                     if staging_server is None or flux_name is None:
                         continue  # Skip if no staging server or flux name
@@ -512,7 +539,8 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                             "ip_adress": ip_adress,
                                             "username": username,
                                             "port": port,
-                                            "nb_list_disabled":nb_list_processors_disabled
+                                            "nb_list_disabled":nb_list_processors_disabled,
+                                            "regex":regex
                                         }
                                     )
                                     record_id += 1
@@ -541,7 +569,8 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
                                                     "ip_adress": ip_adress,
                                                     "username": username,
                                                     "port": port,
-                                                    "nb_list_disabled":nb_list_processors_disabled
+                                                    "nb_list_disabled":nb_list_processors_disabled,
+                                                    "regex":regex
                                                 }
                                             )
                                             record_id += 1

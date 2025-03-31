@@ -68,7 +68,8 @@ dic_rdms_hive_dependencies=generate_dic_with_rdms_and_dependencies(dic_rdms_hive
 # permet de ratacher à chaque source de données le ou les noms des hql qui l'alimente
 dict_tables_dependencies_and_fields,_=measure_execution_time(create_dict_tables_dependencies_and_path,dict_table_paths,dic_rdms_hive_dependencies,create_table_dic,dic_files_queries_paths)
 
-#data_sources_lineage(hdfs_dir,paths_scripts,directory_conf,flow_file_path,filter_list,"dependencies_with_raw_server_filtered.xlsx")  
+filter_list=["MON.FT_GLOBAL_ACTIVITY"]
+data_sources_lineage(hdfs_dir,paths_scripts,directory_conf,flow_file_path,filter_list,"dependencies_with_raw_server_filtered.xlsx")  
 #dict_tables_hive,_=measure_execution_time(create_dict_tables_dependencies_and_path_for_hive_tables,dict_table_paths,dic_tables_dependencies,create_table_dic)
 """
 print("dict_tables_dependencies_and_fields")
@@ -88,11 +89,11 @@ for i,value in dict_tables_hive.items():
 #lineage_dic_for_one_chain_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
 
 #lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage_for_data_lake,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_tables_hive)
-lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_fields_from_dwh)
+#lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_fields_from_dwh)
 
 #print("lineage_fields_across_dependencies",lineage_fields_across_dependencies)
 #export_tracking_lineage_to_excel(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
-export_tracking_lineage_to_excel_23(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
+#export_tracking_lineage_to_excel_23(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
 #dict_tables_hql_from_request_lineage=get_hql_path_from_table_name(dict_table_paths,list_table_from_hql)
 #print(dict_tables_hql_from_request_lineage)
 #nom="MON.FT_CONTRACT_SNAPSHOT"

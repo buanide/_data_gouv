@@ -7,9 +7,9 @@ import time
 
 table_dict = {}
 connection = oracledb.connect(
-    user="mon", 
-    password="Mon123ocm#", 
-    dsn="172.26.75.14:20303/OCMDWH"
+    user="", 
+    password="", 
+    dsn=""
 )
 
 # Créer la connexion SQLAlchemy
