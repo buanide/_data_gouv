@@ -33,7 +33,7 @@ from data_lineage.fields import export_tracking_lineage_to_excel
 from data_lineage.utils import display_table_dependencies_2
 from data_lineage.format_json import read_json
 from data_lineage.data_sources import data_sources_lineage
-from data_lineage.fields import export_tracking_lineage_to_excel_23
+from data_lineage.fields import export_tracking_lineage_to_excel_2
 
 # Démarrer le chronomètre
 path=r"C:\\Users\\YBQB7360\\Downloads\\HDFS\\HDFS\\PROD\\SCRIPTS\\FT\\BDI\\FT_BDI_AMELIORE\\insert_into_spark_ft_bdi_ameliore.hql"
@@ -55,12 +55,6 @@ dic_rdms_hive=extract_hive_table_and_queries(directory_conf)
 dict_table_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
 dic_files_queries_paths = process_conf_files(directory_conf, hdfs_dir)
 
-
-
-# print("liste champs")
-# a,b,c,d=extract_exec_queries(r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF\ZEBRA\IT\load-it-zebra-master.conf")
-# print("raw",c,"tt",d)
-#list_table_from_hql=get_unique_tables_names_from_lineage_dict(lineage_dic)
 #  dic table hive -> dependances
 dic_tables_dependencies = get_dir_dependances_2(dic_files_queries_paths)
 #display_table_dependencies_2(dic_tables_dependencies,"MON.SPARK_SMS_PARC")
@@ -89,11 +83,11 @@ for i,value in dict_tables_hive.items():
 #lineage_dic_for_one_chain_of_dependencies,t=measure_execution_time(build_lineage,dependencies,create_table_dic)
 
 #lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage_for_data_lake,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_tables_hive)
-#lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_fields_from_dwh)
+lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_fields_from_dwh)
 
 #print("lineage_fields_across_dependencies",lineage_fields_across_dependencies)
 #export_tracking_lineage_to_excel(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
-#export_tracking_lineage_to_excel_23(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
+export_tracking_lineage_to_excel_2(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
 #dict_tables_hql_from_request_lineage=get_hql_path_from_table_name(dict_table_paths,list_table_from_hql)
 #print(dict_tables_hql_from_request_lineage)
 #nom="MON.FT_CONTRACT_SNAPSHOT"

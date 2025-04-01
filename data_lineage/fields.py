@@ -972,13 +972,20 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
          for entry in entries:
               # Vérifier si l'entrée précédente existe et si le champ ou l'alias est présent dans l'entrée actuelle
              if previous_entry!=None:
+                 previous_rdms_field = previous_entry.get("rdms_field", "")
                  previous_field = previous_entry.get("Champ", "")
                  previous_alias = previous_entry.get("Alias", "")
+                 current_rdms_field = entry.get("rdms_field", "")
                  current_formula = entry.get("Formule SQL", "")
- 
-                 if previous_field not in current_formula and previous_alias not in current_formula:
-                     continue  # Passer à l'entrée suivante si aucune correspondance n'est trouvée
- 
+                #on verifie qu'on suit le lineage d'un champ rdms
+                 if previous_rdms_field!=None:
+                     if previous_rdms_field == current_rdms_field:
+                         print("on suit le même champ")
+                         print("previous rdms field",previous_rdms_field,"previous_alias",previous_alias,"formule",current_formula)
+                         print("current dwh field",entry.get("rdms_field"),"curent alias",entry.get("Alias"),"formule",entry.get("Formule SQL"))
+                         if previous_field not in current_formula and previous_alias not in current_formula:
+                            continue  # Passer à l'entrée suivante si aucune correspondance n'est trouvée
+                         pass
              # Ajouter l'entrée à la liste all_data
              all_data.append({
                  "Tables utilisées": entry.get("Table(s) utilisées", ""),

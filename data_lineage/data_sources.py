@@ -44,7 +44,7 @@ def data_sources_lineage(root_dir:str,scripts_dir:str,directory_conf:str,nifi_fl
     #print("dic_process_group",list(dic_process_group.values())[0])
     list_dic = structure_dic(dic_process_group, dic_dependencies)
 
-    for i in len(0,10):
+    for i in range(0,10):
         print(list_dic[0])
     #generate_excel_with_dependencies_3(dic_rdms_hive,dic_tables_dependances, list_dic, name_file,list_table_dwh)
 
