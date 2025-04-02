@@ -981,11 +981,11 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
                  if previous_rdms_field!=None:
                      if previous_rdms_field == current_rdms_field:
                          print("on suit le même champ")
-                         print("previous rdms field",previous_rdms_field,"previous_alias",previous_alias,"formule",current_formula)
-                         print("current dwh field",entry.get("rdms_field"),"curent alias",entry.get("Alias"),"formule",entry.get("Formule SQL"))
+                         print("previous rdms field:",previous_rdms_field,"previous_alias:",previous_alias,"formule:",current_formula)
+                         print("current dwh field:",entry.get("rdms_field"),"curent alias:",entry.get("Alias"),"formule:",entry.get("Formule SQL"))
                          if previous_field not in current_formula and previous_alias not in current_formula:
                             continue  # Passer à l'entrée suivante si aucune correspondance n'est trouvée
-                         pass
+                         
              # Ajouter l'entrée à la liste all_data
              all_data.append({
                  "Tables utilisées": entry.get("Table(s) utilisées", ""),
@@ -1028,80 +1028,31 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
  
      # Exporter vers Excel
      df = df.drop_duplicates()
-     df.to_excel(file_name, index=False, engine="openpyxl")
+        # Vérifier si l'alias de la ligne actuelle est présent dans "Formule SQL" de la ligne suivante
+     filtered_dfs = []
+    # Boucle sur les valeurs uniques de "rdms_field"
+     for field in df["dwh_fields"].unique():
+        sub_df = df[df["dwh_fields"] == field].copy()  # Filtrer par rdms_field
+        # Décalage de "Formule SQL" d'une ligne vers le bas
+        sub_df["Formule SQL Décalée"] = sub_df["Formule SQL"].shift(-1)
+        sub_df["Alias Décalée"] = sub_df["Alias"].shift(-1)
+        # Vérifier si l'alias actuel est dans la "Formule SQL Décalée"
+        mask = sub_df.apply(lambda row: 
+    isinstance(row["Alias"], str) and 
+    isinstance(row["Formule SQL Décalée"], str) and 
+    (row["Alias"] in row["Formule SQL Décalée"] or 
+     (isinstance(row["Alias Décalée"], str) and row["Alias"] in row["Alias Décalée"]  )), 
+    axis=1)
+
+        # Appliquer le filtre et ajouter au résultat
+        filtered_dfs.append(sub_df[mask | mask.shift(1).fillna(False)])
+    # Affichage du résultat
+     final_df = pd.concat(filtered_dfs, ignore_index=True)
+     print(final_df[final_df["dwh_fields"] == "BYTES_CREDITED"])
+
+     #df.to_excel(file_name, index=False, engine="openpyxl")
     
 
-
-def export_tracking_lineage_to_excel_23(lineage_data, file_name):
-    """
-    Exporte le lineage des champs sous forme d'un fichier Excel, en regroupant par dwh_fields
-    et en ajoutant une colonne pour le numéro de l'étape de transformation.
-
-    Args:
-        lineage_data (dict): Résultat de `track_fields_across_lineage`
-        file_name (str): Nom du fichier Excel de sortie (par défaut "lineage_tracking.xlsx")
-    """
-    all_data = []
-    previous_entry = None  # Variable pour stocker l'entrée précédente
-    # Construire la liste initiale
-    for field, entries in lineage_data.items():
-        list_entries=[]
-        for entry in entries:
-             # Vérifier si l'entrée précédente existe et si le champ ou l'alias est présent dans l'entrée actuelle
-            if previous_entry!=None:
-                previous_field = previous_entry.get("colonne", "")
-                previous_alias = previous_entry.get("Alias", "")
-                current_formula = entry.get("Formule SQL", "")
-
-                if previous_field not in current_formula and previous_alias not in current_formula:
-                    continue  # Passer à l'entrée suivante si aucune correspondance n'est trouvée
-            else:# Si c'est la première entrée, on l'ajoute directement
-                if entry.get("colonne") == "":
-                    previous_entry = entry
-                continue
-
-            # Ajouter l'entrée à la liste all_data
-            all_data.append({
-                "Tables utilisées": entry.get("Table(s) utilisées", ""),
-                "dwh_fields": entry.get("rdms_field", ""),
-                "Champ": entry.get("colonne", ""),
-                "Alias": entry.get("Alias", ""),
-                "Chemin du fichier HQL": entry["path"],
-                "Opérations arithmétiques": ", ".join(entry["Opérations arithmétiques"]),
-                "Formule SQL": entry["Formule SQL"]
-            })
-
-            # Mettre à jour l'entrée précédente
-            previous_entry = entry
-
-    # Convertir en DataFrame pour faciliter le traitement
-    df = pd.DataFrame(all_data)
-    # Grouper par dwh_fields
-    grouped = df.groupby("dwh_fields")
-
-    # Ajouter une colonne pour le numéro de l'étape
-    df["Étape"] = 0  # Initialiser la colonne des étapes
-
-    for dwh_field, group in grouped:
-        # Trier les entrées par "Chemin du fichier HQL" (mettre les entrées sans chemin en dernier)
-        group = group.sort_values(by="Chemin du fichier HQL", na_position="last")
-
-        # Identifier les chemins uniques
-        unique_paths = group["Chemin du fichier HQL"].dropna().unique()
-        total_steps = len(unique_paths) + 1  # Ajouter 1 pour l'étape sans chemin
-
-        # Attribuer les numéros d'étapes de manière décroissante
-        step_mapping = {path: total_steps - i for i, path in enumerate(unique_paths, start=1)}
-        step_mapping[None] = 1  # La dernière étape est pour les entrées sans chemin
-
-        # Appliquer le mapping des étapes
-        for index, row in group.iterrows():
-            path = row["Chemin du fichier HQL"]
-            df.loc[index, "Étape"] = step_mapping.get(path, 1)
-
-    # Exporter vers Excel
-    df = df.drop_duplicates()
-    df.to_excel(file_name, index=False, engine="openpyxl")
 
 """
 

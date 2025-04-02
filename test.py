@@ -63,7 +63,7 @@ dic_rdms_hive_dependencies=generate_dic_with_rdms_and_dependencies(dic_rdms_hive
 dict_tables_dependencies_and_fields,_=measure_execution_time(create_dict_tables_dependencies_and_path,dict_table_paths,dic_rdms_hive_dependencies,create_table_dic,dic_files_queries_paths)
 
 filter_list=["MON.FT_GLOBAL_ACTIVITY"]
-data_sources_lineage(hdfs_dir,paths_scripts,directory_conf,flow_file_path,filter_list,"dependencies_with_raw_server_filtered.xlsx")  
+#data_sources_lineage(hdfs_dir,paths_scripts,directory_conf,flow_file_path,filter_list,"dependencies_with_raw_server_filtered.xlsx")  
 #dict_tables_hive,_=measure_execution_time(create_dict_tables_dependencies_and_path_for_hive_tables,dict_table_paths,dic_tables_dependencies,create_table_dic)
 """
 print("dict_tables_dependencies_and_fields")
