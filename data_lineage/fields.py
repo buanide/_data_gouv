@@ -970,21 +970,6 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
      # Construire la liste initiale
      for field, entries in lineage_data.items():
          for entry in entries:
-              # Vérifier si l'entrée précédente existe et si le champ ou l'alias est présent dans l'entrée actuelle
-             if previous_entry!=None:
-                 previous_rdms_field = previous_entry.get("rdms_field", "")
-                 previous_field = previous_entry.get("Champ", "")
-                 previous_alias = previous_entry.get("Alias", "")
-                 current_rdms_field = entry.get("rdms_field", "")
-                 current_formula = entry.get("Formule SQL", "")
-                #on verifie qu'on suit le lineage d'un champ rdms
-                 if previous_rdms_field!=None:
-                     if previous_rdms_field == current_rdms_field:
-                         print("on suit le même champ")
-                         print("previous rdms field:",previous_rdms_field,"previous_alias:",previous_alias,"formule:",current_formula)
-                         print("current dwh field:",entry.get("rdms_field"),"curent alias:",entry.get("Alias"),"formule:",entry.get("Formule SQL"))
-                         if previous_field not in current_formula and previous_alias not in current_formula:
-                            continue  # Passer à l'entrée suivante si aucune correspondance n'est trouvée
                          
              # Ajouter l'entrée à la liste all_data
              all_data.append({
@@ -1036,19 +1021,28 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
         # Décalage de "Formule SQL" d'une ligne vers le bas
         sub_df["Formule SQL Décalée"] = sub_df["Formule SQL"].shift(-1)
         sub_df["Alias Décalée"] = sub_df["Alias"].shift(-1)
+        sub_df["Champ Décalé"] = sub_df["Champ"].shift(-1)
         # Vérifier si l'alias actuel est dans la "Formule SQL Décalée"
+         # Vérification avant d'accéder à la première ligne
+        first_alias = sub_df.iloc[0]["Alias"] if not sub_df.empty else None
+
+        # Appliquer le masque
         mask = sub_df.apply(lambda row: 
-    isinstance(row["Alias"], str) and 
-    isinstance(row["Formule SQL Décalée"], str) and 
-    (row["Alias"] in row["Formule SQL Décalée"] or 
-     (isinstance(row["Alias Décalée"], str) and row["Alias"] in row["Alias Décalée"]  )), 
-    axis=1)
+                            isinstance(row["Alias"], str) and 
+                            isinstance(row["Formule SQL Décalée"], str) and 
+                            ((isinstance(row["Alias Décalée"], str)) and
+                             isinstance(row["Champ Décalé"], str) and
+                            (row["Alias"] == first_alias or 
+                            row["Champ"] == first_alias) or
+                            row["Champ Décalé"] == first_alias), 
+                            axis=1)
 
         # Appliquer le filtre et ajouter au résultat
-        filtered_dfs.append(sub_df[mask | mask.shift(1).fillna(False)])
+        filtered_dfs.append(sub_df[mask])
     # Affichage du résultat
      final_df = pd.concat(filtered_dfs, ignore_index=True)
-     print(final_df[final_df["dwh_fields"] == "BYTES_CREDITED"])
+     final_df=final_df.drop(columns=["Formule SQL Décalée", "Alias Décalée", "Champ Décalé"], inplace=True)
+     print(final_df[final_df["dwh_fields"] == "BYTES_DEBITED"])
 
      #df.to_excel(file_name, index=False, engine="openpyxl")
     
