@@ -987,30 +987,23 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
  
      # Convertir en DataFrame pour faciliter le traitement
      df = pd.DataFrame(all_data)
- 
      # Grouper par dwh_fields
      grouped = df.groupby("dwh_fields")
- 
      # Ajouter une colonne pour le numéro de l'étape
      df["Étape"] = 0  # Initialiser la colonne des étapes
- 
      for dwh_field, group in grouped:
          # Trier les entrées par "Chemin du fichier HQL" (mettre les entrées sans chemin en dernier)
          group = group.sort_values(by="Chemin du fichier HQL", na_position="last")
- 
          # Identifier les chemins uniques
          unique_paths = group["Chemin du fichier HQL"].dropna().unique()
          total_steps = len(unique_paths) + 1  # Ajouter 1 pour l'étape sans chemin
- 
          # Attribuer les numéros d'étapes de manière décroissante
          step_mapping = {path: total_steps - i for i, path in enumerate(unique_paths, start=1)}
          step_mapping[None] = 1  # La dernière étape est pour les entrées sans chemin
- 
          # Appliquer le mapping des étapes
          for index, row in group.iterrows():
              path = row["Chemin du fichier HQL"]
              df.loc[index, "Étape"] = step_mapping.get(path, 1)
- 
      # Exporter vers Excel
      df = df.drop_duplicates()
         # Vérifier si l'alias de la ligne actuelle est présent dans "Formule SQL" de la ligne suivante
@@ -1024,29 +1017,29 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
         sub_df["Champ Décalé"] = sub_df["Champ"].shift(-1)
         # Vérifier si l'alias actuel est dans la "Formule SQL Décalée"
          # Vérification avant d'accéder à la première ligne
+
+        
         first_alias = sub_df.iloc[0]["Alias"] if not sub_df.empty else None
-
         # Appliquer le masque
-        mask = sub_df.apply(lambda row: 
-                            isinstance(row["Alias"], str) and 
-                            isinstance(row["Formule SQL Décalée"], str) and 
-                            ((isinstance(row["Alias Décalée"], str)) and
-                             isinstance(row["Champ Décalé"], str) and
-                            (row["Alias"] == first_alias or 
-                            row["Champ"] == first_alias) or
-                            row["Champ Décalé"] == first_alias), 
-                            axis=1)
+        if field=="BYTES_CREDITED":
+            print("first_alias",first_alias)
 
+        mask = sub_df.apply(lambda row:(isinstance(row["Alias"], str) and
+                                        (
+                                            row["Alias"] == first_alias or
+                                            row["Champ"] == first_alias 
+                                        )                                
+                                         ), 
+                                         axis=1)
+        
+         # Affichage des lignes qui passent le filtrage
         # Appliquer le filtre et ajouter au résultat
         filtered_dfs.append(sub_df[mask])
     # Affichage du résultat
      final_df = pd.concat(filtered_dfs, ignore_index=True)
-     final_df=final_df.drop(columns=["Formule SQL Décalée", "Alias Décalée", "Champ Décalé"], inplace=True)
-     print(final_df[final_df["dwh_fields"] == "BYTES_DEBITED"])
-
+     final_df=final_df.drop(columns=["Formule SQL Décalée", "Alias Décalée", "Champ Décalé"])
+     print(final_df[final_df["dwh_fields"] == "BYTES_CREDITED"])
      #df.to_excel(file_name, index=False, engine="openpyxl")
-    
-
 
 """
 
