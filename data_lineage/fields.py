@@ -795,17 +795,20 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                                                 print("L'alias n'est pas dans la liste des champs de la table")
                                         
                                         formule=info.get("Formule SQL", "")
+                                        alias=info.get("Alias/Projection", None)
                                         if col in formule:
                                             if rdms_field!=None:
-                                                field_entry = {
-                                                    "rdms_field":rdms_field,
-                                                    "path": hql_file,
-                                                    "colonne": col,
-                                                    "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
-                                                    "Alias": info.get("Alias/Projection", None),
-                                                    "Formule SQL": info.get("Formule SQL", ""),
-                                                    "Table(s) utilisées": info.get("Table(s) utilisées", "")
-                                                }
+                                                #op=info.get("Alias/Projection", None)
+                                                if rdms_field.lower()==alias or rdms_field.lower()==col.lower():
+                                                    field_entry = {
+                                                        "rdms_field":rdms_field,
+                                                        "path": hql_file,
+                                                        "colonne": col,
+                                                        "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
+                                                        "Alias": info.get("Alias/Projection", None),
+                                                        "Formule SQL": info.get("Formule SQL", ""),
+                                                        "Table(s) utilisées": info.get("Table(s) utilisées", "")
+                                                    }
                                             else:
                                                 field_entry = {
                                                     "rdms_field":"",
@@ -955,14 +958,13 @@ def export_tracking_lineage_to_excel(lineage_data, file_name):
     # Exporter vers Excel
     df.to_excel(file_name, index=False, engine="openpyxl")
 
-
 def export_tracking_lineage_to_excel_2(lineage_data, file_name):
      """
      Exporte le lineage des champs sous forme d'un fichier Excel, en regroupant par dwh_fields
      et en ajoutant une colonne pour le numéro de l'étape de transformation.
  
      Args:
-         lineage_data (dict): Résultat de `track_fields_across_lineage`
+         lineage_data (dict): Résultat de track_fields_across_lineage
          file_name (str): Nom du fichier Excel de sortie (par défaut "lineage_tracking.xlsx")
      """
      all_data = []
@@ -1005,41 +1007,10 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
              path = row["Chemin du fichier HQL"]
              df.loc[index, "Étape"] = step_mapping.get(path, 1)
      # Exporter vers Excel
-     df = df.drop_duplicates()
-        # Vérifier si l'alias de la ligne actuelle est présent dans "Formule SQL" de la ligne suivante
-     filtered_dfs = []
-    # Boucle sur les valeurs uniques de "rdms_field"
-     for field in df["dwh_fields"].unique():
-        sub_df = df[df["dwh_fields"] == field].copy()  # Filtrer par rdms_field
-        # Décalage de "Formule SQL" d'une ligne vers le bas
-        sub_df["Formule SQL Décalée"] = sub_df["Formule SQL"].shift(-1)
-        sub_df["Alias Décalée"] = sub_df["Alias"].shift(-1)
-        sub_df["Champ Décalé"] = sub_df["Champ"].shift(-1)
-        # Vérifier si l'alias actuel est dans la "Formule SQL Décalée"
-         # Vérification avant d'accéder à la première ligne
+    
+     df=df.drop_duplicates()
+     df.to_excel(file_name, index=False, engine="openpyxl")
 
-        
-        first_alias = sub_df.iloc[0]["Alias"] if not sub_df.empty else None
-        # Appliquer le masque
-        if field=="BYTES_CREDITED":
-            print("first_alias",first_alias)
-
-        mask = sub_df.apply(lambda row:(isinstance(row["Alias"], str) and
-                                        (
-                                            row["Alias"] == first_alias or
-                                            row["Champ"] == first_alias 
-                                        )                                
-                                         ), 
-                                         axis=1)
-        
-         # Affichage des lignes qui passent le filtrage
-        # Appliquer le filtre et ajouter au résultat
-        filtered_dfs.append(sub_df[mask])
-    # Affichage du résultat
-     final_df = pd.concat(filtered_dfs, ignore_index=True)
-     final_df=final_df.drop(columns=["Formule SQL Décalée", "Alias Décalée", "Champ Décalé"])
-     print(final_df[final_df["dwh_fields"] == "BYTES_CREDITED"])
-     #df.to_excel(file_name, index=False, engine="openpyxl")
 
 """
 
