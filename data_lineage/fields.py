@@ -1000,8 +1000,16 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
          unique_paths = group["Chemin du fichier HQL"].dropna().unique()
          total_steps = len(unique_paths) + 1  # Ajouter 1 pour l'étape sans chemin
          # Attribuer les numéros d'étapes de manière décroissante
-         step_mapping = {path: total_steps - i for i, path in enumerate(unique_paths, start=1)}
-         step_mapping[None] = 1  # La dernière étape est pour les entrées sans chemin
+         step_mapping = {path: i for i, path in enumerate(unique_paths, start=1)}
+         step_mapping[None] = len(unique_paths) + 1 
+
+         # le dictionnaire est de la forme
+         #step_mapping = {
+            #'/scripts/step1.hql': 4 - 1 = 3,
+            #'/scripts/step2.hql': 4 - 2 = 2,
+            #'/scripts/step3.hql': 4 - 3 = 1,
+            #}
+         #step_mapping[None] = 1  # La dernière étape est pour les entrées sans chemin
          # Appliquer le mapping des étapes
          for index, row in group.iterrows():
              path = row["Chemin du fichier HQL"]

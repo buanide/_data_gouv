@@ -1,25 +1,12 @@
 import sqlglot
 import os
 from sqlglot import exp
-from sqlglot import parse_one
-from sqlglot.optimizer.scope import find_all_in_scope
-from sqlglot.optimizer.scope import build_scope
-from sqlglot.lineage import lineage
-import re
-from sqlglot import exp
-from sqlglot.optimizer.qualify import qualify
+
 from data_lineage.utils import list_all_files
 from data_lineage.fields import process_hql_files
-from data_lineage.fields import extract_lineage_fields
-from data_lineage.fields import export_lineage_to_excel
-from data_lineage.fields import create_lineage_dic
-from data_lineage.fields import print_lineage_dict
 from data_lineage.utils import map_rdms_file_hql_file
 from data_lineage.utils import extract_hive_table_and_queries
-from data_lineage.fields import get_unique_tables_names_from_lineage_dict
-from data_lineage.utils import extract_exec_queries
 from data_lineage.utils import generate_dic_with_rdms_and_dependencies
-from data_lineage.fields import get_hql_path_from_table_name
 from data_lineage.utils import process_conf_files
 from data_lineage.utils import get_dir_dependances_2
 from data_lineage.fields import create_dict_tables_dependencies_and_path
@@ -32,7 +19,6 @@ from data_lineage.utils import measure_execution_time
 from data_lineage.fields import export_tracking_lineage_to_excel_2
 from data_lineage.utils import display_table_dependencies_2
 from data_lineage.format_json import read_json
-from data_lineage.data_sources import data_sources_lineage
 from data_lineage.fields import export_tracking_lineage_to_excel
 
 # Démarrer le chronomètre
@@ -94,8 +80,3 @@ lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_
 #print("lineage_fields_across_dependencies",lineage_fields_across_dependencies)
 export_tracking_lineage_to_excel_2(lineage_fields_across_dependencies,"lineage_sorted"+table_name+".xlsx")
 #export_tracking_lineage_to_excel_2(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
-#dict_tables_hql_from_request_lineage=get_hql_path_from_table_name(dict_table_paths,list_table_from_hql)
-#print(dict_tables_hql_from_request_lineage)
-#nom="MON.FT_CONTRACT_SNAPSHOT"
-#for i,value in dict_table_paths.items():
-    #contrat=dict_table_paths.get(nom,None)
