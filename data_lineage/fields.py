@@ -577,7 +577,8 @@ def create_dict_tables_dependencies_and_path(
                 # récupération paths 
                 file_dep = dict_table_paths.get(dependencies[dep], None)
                 # Stocker la dépendance avec son fichier HQL
-                dict_tables_dependencies[rdms]["dependencies"][dependencies[dep]] = file_dep
+                #dict_tables_dependencies[rdms]["dependencies"][dependencies[dep]] = file_dep
+                dict_tables_dependencies[rdms]["dependencies"][dependencies[dep]] = {'path':file_dep,'position':dep}
     return dict_tables_dependencies
 
 
@@ -668,9 +669,10 @@ def build_lineage(dependencies, results):
               le résultat de l'analyse par `create_lineage_dic`.
     """
     lineage = {}
-    for hive_table, hql_files in dependencies.items():
+    for hive_table, data in dependencies.items():
+        hql_files = data.get("path", None)
+        position = data.get("position", None) 
         if hive_table!=None:
-
             if isinstance(hql_files, str):  # Gérer le cas où un seul fichier est donné sous forme de chaîne
                 hql_files = [hql_files] 
             if hql_files!=None:       
@@ -679,7 +681,10 @@ def build_lineage(dependencies, results):
                         if os.path.exists(hql_file):  # Vérifie que le fichier existe
                             current_lineage_dict=create_lineage_dic(hql_file, results)
                             #print("current_lineage_dict",current_lineage_dict)
+                            
+                            current_lineage_dict["position"]=position
                             lineage[hql_file] = current_lineage_dict
+                            #lineage["position"]=data.get("position",None)
                             #print("lineage",lineage)
                         else:
                             print(f"Fichier HQL non trouvé : {hql_file}")
@@ -748,79 +753,89 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
             if fields_rdms_tmp!=None:
                     # 
                     for hql_file, tables in lineage.items():
-                        for table, details in tables.items():
-                            for key, info in details.items():
-                                detected_column = info.get("Colonnes détectées",None)
-                                if not detected_column:  # Si aucune colonne détectée
-                                    detected_column = "NO DETECTED COLUMN"
-                                    if not detected_column:
-                                        detected_column = "INCONNUE"
-                                # Si c'est une liste, on la met en minuscule
-                                if isinstance(detected_column, list):
-                                    detected_column = [col.lower() for col in detected_column]
-                                else:
-                                    detected_column = detected_column.lower()
-                                for col in detected_column if isinstance(detected_column, list) else [detected_column]:
-                                    if col not in overall_field_tracking:
-                                        overall_field_tracking[col] = []
-                                    # on a besoin de connaitre à quel champ de la table temporaire au dwh correspond le champ de la table du datalake
-                                    alias=info.get("Alias/Projection", None)
-                                    alias_upper=alias.upper()
-                                    #print("fields_rdms_tmp",fields_rdms_tmp)
-                                    previous_entry = None
-                                    if alias!=None:
-                                        # on regarde si l'alias est dans la liste des champs des champs
-                                        #  de dernière table d'aggrégation avant l'insertion dans la table rdms     
-                                        if  alias_upper in fields_rdms_tmp:
-                                            try:    
-                                               # on se rassure que les deux listes de champs ont la même taille 
-                                              
-                                                if len(fields_rdms_tmp)==len(fields_rdms):
-                                                     #print("same size")
-                                                     indice = fields_rdms_tmp.index(alias_upper)  # 25 n'est pas dans la liste
-                                                     rdms_field=fields_rdms[indice]
-                                                     #print("rdms_field",rdms_field)
-                                                     #print("alias",alias)
-                                                     field_entry = {
-                                                        "rdms_field":rdms_field,
-                                                        "path": "",
-                                                        "colonne": "",
-                                                        "Opérations arithmétiques": "",
-                                                        "Alias": alias,
-                                                        "Formule SQL": "",
-                                                        "Table(s) utilisées": ""
-                                                    }
-                                                     overall_field_tracking[col].append(field_entry)
-                                            except ValueError:
-                                                print("L'alias n'est pas dans la liste des champs de la table")
-                                        
-                                        formule=info.get("Formule SQL", "")
+                            position_hql_in_dependances=tables.get("position",None)
+                            #print("position_hql_in_dependances",position_hql_in_dependances)
+                            for table, details in tables.items():
+                                if not isinstance(details, dict):
+                                    #print(f"Attention : 'details' n'est pas un dictionnaire mais un {type(details)}. Valeur : {details}")
+                                    continue 
+                                for key, info in details.items():
+                                    detected_column = info.get("Colonnes détectées",None)
+                                    #position_hql_in_dependances=details.get("position",None)
+                                    if not detected_column:  # Si aucune colonne détectée
+                                        detected_column = "NO DETECTED COLUMN"
+                                        if not detected_column:
+                                            detected_column = "INCONNUE"
+                                    # Si c'est une liste, on la met en minuscule
+                                    if isinstance(detected_column, list):
+                                        detected_column = [col.lower() for col in detected_column]
+                                    else:
+                                        detected_column = detected_column.lower()
+                                    for col in detected_column if isinstance(detected_column, list) else [detected_column]:
+                                        if col not in overall_field_tracking:
+                                            overall_field_tracking[col] = []
+                                        # on a besoin de connaitre à quel champ de la table temporaire au dwh correspond le champ de la table du datalake
                                         alias=info.get("Alias/Projection", None)
-                                        if col in formule:
-                                            if rdms_field!=None:
-                                                #op=info.get("Alias/Projection", None)
-                                                if rdms_field.lower()==alias or rdms_field.lower()==col.lower():
+                                        alias_upper=alias.upper()
+                                        #print("fields_rdms_tmp",fields_rdms_tmp)
+                                        previous_entry = None
+                                        if alias!=None:
+                                            # on regarde si l'alias est dans la liste des champs des champs
+                                            #  de dernière table d'aggrégation avant l'insertion dans la table rdms     
+                                            if  alias_upper in fields_rdms_tmp:
+                                                try:    
+                                                # on se rassure que les deux listes de champs ont la même taille 
+                                                
+                                                    if len(fields_rdms_tmp)==len(fields_rdms):
+                                                        #print("same size")
+                                                        indice = fields_rdms_tmp.index(alias_upper)  # 25 n'est pas dans la liste
+                                                        rdms_field=fields_rdms[indice]
+                                                        #print("rdms_field",rdms_field)
+                                                        #print("alias",alias)
+                                                        field_entry = {
+                                                            "rdms_field":rdms_field,
+                                                            "path": "",
+                                                            "position":"",
+                                                            "colonne": "",
+                                                            "Opérations arithmétiques": "",
+                                                            "Alias": alias,
+                                                            "Formule SQL": "",
+                                                            "Table(s) utilisées": ""
+                                                        }
+                                                        overall_field_tracking[col].append(field_entry)
+                                                except ValueError:
+                                                    print("L'alias n'est pas dans la liste des champs de la table")
+                                            
+                                            formule=info.get("Formule SQL", "")
+                                            alias=info.get("Alias/Projection", None)
+                                            if col in formule:
+                                                if rdms_field!=None:
+                                                    #op=info.get("Alias/Projection", None)
+                                                    if rdms_field.lower()==alias or rdms_field.lower()==col.lower():
+                                                        field_entry = {
+                                                            "rdms_field":rdms_field,
+                                                            "path": hql_file,
+                                                            "position":position_hql_in_dependances,
+                                                            "colonne": col,
+                                                            "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
+                                                            "Alias": info.get("Alias/Projection", None),
+                                                            "Formule SQL": info.get("Formule SQL", ""),
+                                                            "Table(s) utilisées": info.get("Table(s) utilisées", "")
+                                                        }
+                                                else:
                                                     field_entry = {
-                                                        "rdms_field":rdms_field,
+                                                        "rdms_field":"",
                                                         "path": hql_file,
+                                                        "position":position_hql_in_dependances,
                                                         "colonne": col,
                                                         "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
                                                         "Alias": info.get("Alias/Projection", None),
                                                         "Formule SQL": info.get("Formule SQL", ""),
                                                         "Table(s) utilisées": info.get("Table(s) utilisées", "")
                                                     }
-                                            else:
-                                                field_entry = {
-                                                    "rdms_field":"",
-                                                    "path": hql_file,
-                                                    "colonne": col,
-                                                    "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
-                                                    "Alias": info.get("Alias/Projection", None),
-                                                    "Formule SQL": info.get("Formule SQL", ""),
-                                                    "Table(s) utilisées": info.get("Table(s) utilisées", "")
-                                                }
 
-                                    overall_field_tracking[col].append(field_entry)
+                                        overall_field_tracking[col].append(field_entry)
+                        
     return overall_field_tracking
 
 
@@ -979,6 +994,7 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
                  "dwh_fields": entry.get("rdms_field", ""),
                  "Champ": entry.get("colonne", ""),
                  "Alias": entry.get("Alias", ""),
+                 "Etape": entry.get("position", ""),
                  "Chemin du fichier HQL": entry["path"],
                  "Opérations arithmétiques": ", ".join(entry["Opérations arithmétiques"]),
                  "Formule SQL": entry["Formule SQL"]
@@ -990,30 +1006,9 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
      # Convertir en DataFrame pour faciliter le traitement
      df = pd.DataFrame(all_data)
      # Grouper par dwh_fields
-     grouped = df.groupby("dwh_fields")
+     df = df.groupby("dwh_fields")
      # Ajouter une colonne pour le numéro de l'étape
-     df["Étape"] = 0  # Initialiser la colonne des étapes
-     for dwh_field, group in grouped:
-         # Trier les entrées par "Chemin du fichier HQL" (mettre les entrées sans chemin en dernier)
-         group = group.sort_values(by="Chemin du fichier HQL", na_position="last")
-         # Identifier les chemins uniques
-         unique_paths = group["Chemin du fichier HQL"].dropna().unique()
-         total_steps = len(unique_paths) + 1  # Ajouter 1 pour l'étape sans chemin
-         # Attribuer les numéros d'étapes de manière décroissante
-         step_mapping = {path: i for i, path in enumerate(unique_paths, start=1)}
-         step_mapping[None] = len(unique_paths) + 1 
-
-         # le dictionnaire est de la forme
-         #step_mapping = {
-            #'/scripts/step1.hql': 4 - 1 = 3,
-            #'/scripts/step2.hql': 4 - 2 = 2,
-            #'/scripts/step3.hql': 4 - 3 = 1,
-            #}
-         #step_mapping[None] = 1  # La dernière étape est pour les entrées sans chemin
-         # Appliquer le mapping des étapes
-         for index, row in group.iterrows():
-             path = row["Chemin du fichier HQL"]
-             df.loc[index, "Étape"] = step_mapping.get(path, 1)
+     
      # Exporter vers Excel
     
      df=df.drop_duplicates()

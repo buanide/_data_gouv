@@ -30,7 +30,7 @@ file_scripts_paths=list_all_files(paths_scripts)
 create_table_dic=process_hql_files(file_scripts_paths)
 #dic_table_fields=extract_lineage_fields(hql_content)
 directory_conf = r"C:\Users\YBQB7360\Downloads\HDFS\HDFS\PROD\CONF"
-table_name='MON.FT_GLOBAL_ACTIVITY_DAILY'
+table_name='MON.FT_A_DATA_TRANSFER'
 flow_file_path=r"C:\Users\YBQB7360\Documents\Data gouvernance\PRODv2.0\PRODv2.0.json"
 #liste_table=list(dic_table_fields.keys())
 #lineage_dic,_ = measure_execution_time(create_lineage_dic, path, create_table_dic)
@@ -48,11 +48,24 @@ dic_rdms_hive_dependencies=generate_dic_with_rdms_and_dependencies(dic_rdms_hive
 # permet de ratacher à chaque source de données le ou les noms des hql qui l'alimente
 dict_tables_dependencies_and_fields,_=measure_execution_time(create_dict_tables_dependencies_and_path,dict_table_paths,dic_rdms_hive_dependencies,create_table_dic,dic_files_queries_paths)
 
+
+"""
+for i,value in dict_tables_dependencies_and_fields.items():
+    rdm=value.get('rdms_table',None)
+    if rdm==table_name:
+        #print("i",i,"value",value)
+        #print("rdms_table",value.get('rdms_table',None))
+        #print("first_hive table",value.get('first_hive table',None))
+        dependencies=value.get('dependencies',None)
+        lineage=build_lineage(dependencies,create_table_dic)
+        print("lineage",lineage)
+        break
+"""
 #filter_list=["MON.FT_GLOBAL_ACTIVITY"]
 #data_sources_lineage(hdfs_dir,paths_scripts,directory_conf,flow_file_path,filter_list,"dependencies_with_raw_server_filtered.xlsx")  
 #dict_tables_hive,_=measure_execution_time(create_dict_tables_dependencies_and_path_for_hive_tables,dict_table_paths,dic_tables_dependencies,create_table_dic)
 
-print("dict_tables_dependencies_and_fields")
+#print("dict_tables_dependencies_and_fields")
 """
 ensemble=set()
 for i,value in dict_tables_dependencies_and_fields.items():
@@ -63,11 +76,6 @@ for i,value in dict_tables_dependencies_and_fields.items():
         #print("first_hive table",value.get('first_hive table',None))
         dependencies=value.get('dependencies',None)
         print("dependencies",dependencies)
-   
-    
-
-  
-
 print("dict_tables_hive")
 for i,value in dict_tables_hive.items():
     print("i",i,"value",value)
