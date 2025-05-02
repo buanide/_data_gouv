@@ -11,6 +11,7 @@ import os
 from data_lineage.utils import measure_execution_time
 from functools import wraps
 import hashlib
+from data_lineage.utils import extract_data_sources
 
 
 _analysis_cache = {}
@@ -812,9 +813,12 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                                                 if rdms_field!=None:
                                                     #op=info.get("Alias/Projection", None)
                                                     if rdms_field.lower()==alias or rdms_field.lower()==col.lower():
+                                                        
+                                                        _,main_table=extract_data_sources(hql_file)
                                                         field_entry = {
                                                             "rdms_field":rdms_field,
                                                             "path": hql_file,
+                                                            "table calculée":main_table,
                                                             "position":position_hql_in_dependances,
                                                             "colonne": col,
                                                             "Opérations arithmétiques": info.get("Opérations arithmétiques", []),
@@ -823,8 +827,10 @@ def track_fields_across_lineage(rdms_table_name,data, results,dic_fields_from_dw
                                                             "Table(s) utilisées": info.get("Table(s) utilisées", "")
                                                         }
                                                 else:
+                                                    _,main_table=extract_data_sources(hql_file)
                                                     field_entry = {
                                                         "rdms_field":"",
+                                                        "table calculée":main_table,
                                                         "path": hql_file,
                                                         "position":position_hql_in_dependances,
                                                         "colonne": col,
@@ -987,10 +993,15 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
      # Construire la liste initiale
      for field, entries in lineage_data.items():
          for entry in entries:
-                         
+             operations = ", ".join(entry.get("Opérations arithmétiques", []))
+             tables_computed = entry.get("table calculée", "")
+             if isinstance(tables_computed, list):
+                tables_computed = ", ".join(tables_computed)
+                        
              # Ajouter l'entrée à la liste all_data
              all_data.append({
                  "Tables utilisées": entry.get("Table(s) utilisées", ""),
+                 "Table calculée": tables_computed,
                  "dwh_fields": entry.get("rdms_field", ""),
                  "Champ": entry.get("colonne", ""),
                  "Alias": entry.get("Alias", ""),
@@ -1006,12 +1017,12 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
      # Convertir en DataFrame pour faciliter le traitement
      df = pd.DataFrame(all_data)
      # Grouper par dwh_fields
-     df = df.groupby("dwh_fields")
-     # Ajouter une colonne pour le numéro de l'étape
-     
-     # Exporter vers Excel
-    
+
      df=df.drop_duplicates()
+     #df = df.groupby("dwh_fields")
+     # Ajouter une colonne pour le numéro de l'étape
+     # Exporter vers Excel
+
      df.to_excel(file_name, index=False, engine="openpyxl")
 
 

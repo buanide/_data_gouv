@@ -1,5 +1,8 @@
+MANIFEST.in
 README.md
 pyproject.toml
+setup.py
+DEPENDANCES_FINALE/DEPENDANCES_FINALE.py
 data_lineage/__init__.py
 data_lineage/clean.py
 data_lineage/data_sources.py

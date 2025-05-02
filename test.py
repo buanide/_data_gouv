@@ -87,4 +87,4 @@ for i,value in dict_tables_hive.items():
 lineage_fields_across_dependencies,t=measure_execution_time(track_fields_across_lineage,table_name,dict_tables_dependencies_and_fields,create_table_dic,dict_fields_from_dwh)
 #print("lineage_fields_across_dependencies",lineage_fields_across_dependencies)
 export_tracking_lineage_to_excel_2(lineage_fields_across_dependencies,"lineage_sorted"+table_name+".xlsx")
-#export_tracking_lineage_to_excel_2(lineage_fields_across_dependencies,"lineage_"+table_name+".xlsx")
+

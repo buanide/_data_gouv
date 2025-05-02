@@ -1,0 +1,30 @@
+import sqlglot
+import os
+from sqlglot import exp
+
+from data_lineage.utils import list_all_files
+from data_lineage.fields import process_hql_files
+from data_lineage.utils import map_rdms_file_hql_file
+from data_lineage.utils import extract_hive_table_and_queries
+from data_lineage.utils import generate_dic_with_rdms_and_dependencies
+from data_lineage.utils import process_conf_files
+from data_lineage.utils import get_dir_dependances_2
+from data_lineage.fields import create_dict_tables_dependencies_and_path
+from data_lineage.fields import create_dict_tables_dependencies_and_path_for_hive_tables
+from data_lineage.fields import build_lineage
+from data_lineage.fields import track_fields_across_lineage
+from data_lineage.fields import track_fields_across_lineage_for_data_lake
+import time
+from data_lineage.utils import measure_execution_time
+from data_lineage.fields import export_tracking_lineage_to_excel_2
+from data_lineage.utils import display_table_dependencies_2
+from data_lineage.format_json import read_json
+from data_lineage.fields import export_tracking_lineage_to_excel
+from data_lineage.utils import extract_data_sources
+
+# Démarrer le chronomètre
+
+path=r'C:\Users\YBQB7360\Downloads\SEUNGTO\SEUNGTO\SCRIPTS\IT\insert_into_spark_it_bdi_pp.hql'
+tables, main_table=extract_data_sources(path)
+
+print(tables)
