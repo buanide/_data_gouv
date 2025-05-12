@@ -13,6 +13,7 @@ Requires-Dist: sqlalchemy>=2.0.38
 Requires-Dist: sqlglot>=26.4.1
 Requires-Dist: sqllineage>=1.5.4
 Requires-Dist: sqlparse>=0.5.3
+Requires-Dist: streamlit>=1.45.0
 
 # DATA GOVERNANCE
 

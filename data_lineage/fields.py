@@ -1017,13 +1017,14 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
      # Convertir en DataFrame pour faciliter le traitement
      df = pd.DataFrame(all_data)
      # Grouper par dwh_fields
+     df_sorted = df.sort_values(by=['dwh_fields', 'Etape'])
 
-     df=df.drop_duplicates()
+     df_sorted=df.drop_duplicates()
      #df = df.groupby("dwh_fields")
      # Ajouter une colonne pour le numéro de l'étape
      # Exporter vers Excel
 
-     df.to_excel(file_name, index=False, engine="openpyxl")
+     df_sorted.to_excel(file_name, index=False, engine="openpyxl")
 
 
 """

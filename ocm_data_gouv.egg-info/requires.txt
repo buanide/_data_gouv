@@ -7,3 +7,4 @@ sqlalchemy>=2.0.38
 sqlglot>=26.4.1
 sqllineage>=1.5.4
 sqlparse>=0.5.3
+streamlit>=1.45.0

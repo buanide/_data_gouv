@@ -466,8 +466,11 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
 
         if not dependencies:
             continue  # Skip if no dependencies
-
-        last_dependency = dependencies[-1]  # Get the last dependency (potential raw path)
+        
+        last_dependency=value.get("raw_directory",None)
+        if last_dependency==None:
+            last_dependency = dependencies[-1]  # Get the last dependency (potential raw path)
+        
         if last_dependency and last_dependency.startswith("/"):
             raw_path = last_dependency  # Detected raw directory
             # Extract the first 4 parts of the path to get the base raw directory
@@ -578,6 +581,7 @@ def structure_dic(dic_process_group: dict, dic_dependencies: dict):
     structured_data=filter_best_records(structured_data)
 
     return structured_data
+
 
 
 

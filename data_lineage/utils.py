@@ -1274,6 +1274,87 @@ def display_table_dependencies(dependency_map: dict, table_name: str) -> None:
     df.to_excel(output_file, index=False)
     print(f"Les dépendances de la table '{table_name}' ont été exportées vers : {output_file}")
 
+def display_table_dependencies_for_datalake_tables(dependency_map: dict) -> None:
+    """
+    Affiche les dépendances de toutes les tables du datalake prsentes dans dependency_map, y compris le chemin 'raw', et les écrit dans un fichier Excel.
+
+
+    Args:
+        dependency_map (dict): Dictionnaire des dépendances {table_principale: {'dependances': [dépendances], 'raw': chemin_raw}}.
+        table_name (str): Nom de la table pour laquelle afficher les dépendances.
+
+
+
+
+    exemple d'appel: display_table_dependencies_2(dic_tables_dependances,"AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY")
+    """
+    # Liste pour stocker les chemins uniques de dépendances
+    unique_paths = set()
+
+
+    def get_all_dependencies(table, current_path, visited):
+        """
+        Explore toutes les dépendances d'une table en profondeur et ajoute chaque chemin unique.
+
+
+        Args:
+            table (str): La table pour laquelle les dépendances doivent être explorées.
+            current_path (list): Le chemin courant (accumulé).
+            visited (set): Ensemble des tables déjà visitées pour éviter les cycles.
+        """
+        if table in visited:
+            # Cycle détecté, ajouter le chemin avec une indication
+            unique_paths.add(tuple(current_path + [f"{table} (cycle détecté)"]))
+            return
+
+
+        # Ajouter la table courante au chemin
+        current_path = current_path + [table]
+
+
+        # Si la table n'a pas de dépendances, ajouter le chemin complet
+        if table not in dependency_map or not dependency_map[table].get("dependances", []):
+            unique_paths.add(tuple(current_path))
+            return
+
+
+        # Marquer la table comme visitée
+        visited.add(table)
+
+
+        # Parcourir les dépendances et continuer l'exploration
+        for dependency in dependency_map[table]["dependances"]:
+            get_all_dependencies(dependency, current_path, visited.copy())
+
+
+    for table_name in dependency_map:
+        get_all_dependencies(table_name, [], set())
+    # Convertir les chemins uniques en lignes pour le DataFrame
+    rows = [list(path) for path in unique_paths]
+    # Ajouter la colonne RAW pour la table principale comme dernière colonne
+    for row in rows:
+        raw_value = None
+        for key, value in dependency_map.items():
+            if value.get("cdr_name") == row[-1]:
+                raw_value = value.get("raw_directory")
+                # print('raw_value',raw_value)
+                break
+        row.append(raw_value)
+
+
+    # Déterminer le nombre maximum de colonnes pour formater correctement
+    max_columns = max(len(row) for row in rows)
+    columns = ["Table_Principale"] + [f"Dépendance{i}" for i in range(1, max_columns)]
+
+
+    # Créer un DataFrame avec les données collectées
+    df = pd.DataFrame(rows, columns=columns)
+
+
+    # Exporter les données vers un fichier Excel
+    output_file = f"{table_name}_dependencies.xlsx"
+    df.to_excel(output_file, index=False)
+   
 
 def display_table_dependencies_2(dependency_map: dict, table_name: str) -> None:
     """
