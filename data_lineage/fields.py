@@ -1017,6 +1017,7 @@ def export_tracking_lineage_to_excel_2(lineage_data, file_name):
      # Convertir en DataFrame pour faciliter le traitement
      df = pd.DataFrame(all_data)
      # Grouper par dwh_fields
+     print(df.head())
      df_sorted = df.sort_values(by=['dwh_fields', 'Etape'])
 
      df_sorted=df.drop_duplicates()

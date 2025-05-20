@@ -1,5 +1,7 @@
 # DATA GOVERNANCE
 
+## Summary
+
 This archive aims to enable the extraction of metadata (table dependencies, field dependencies, field descriptions) from various data sources within the OCM ecosystem:
 
 Dependencies of a data source: an element without which the table could not be calculated.
@@ -9,7 +11,19 @@ The different Python files are:
 
 utils.py: contains various functions that allow extracting dependencies from the project containing the necessary code for calculating the tables of the data warehouse and data lake.
 fields.py: contains various functions to ensure fields lineage
-format_json: contains function to parse and structure metadatas from different data pipelines 
+format_json: contains function to parse and structure metadatas from Nifi flow files
+dwh.py: contains a scripts that create a dictionary that contains the fields for each table in the datawarehouse
+EXTRACTION_CDR.py: scripts to display CDR related to datawarehouse tables
+
+## requirements
+
+You need some elements for this code:
+- the hdfs directory
+- the dictionary of datawarehouse fields (table_name->list of fields) in .json format
+- the nifi flow file in .json format
+
+
+## tips
 
 Errors explanations: 
 
@@ -34,13 +48,14 @@ Errors explanations:
 3) modify the demo.py to use function of the package or create your own .py file to use the function that you need
 
 4) to runthe code use: uv run <nom_fichier.py>
-You need some elements for this code:
-
-- the hdfs directory
-- the nifi flow file
 
 
 
+# Limitations
+
+- Some fields can't be totally described cause of the complexity of the request
+- The order in which caclulation are done in field lineage have to de be refined
+- The time of execution for complex Hive Query Language could be improved 
 
 
 
