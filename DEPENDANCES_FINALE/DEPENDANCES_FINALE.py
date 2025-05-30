@@ -146,6 +146,31 @@ else:
         def items(self):
             return self.data.items()
     
+    # Fonction pour déterminer l'ordre de priorité des tables
+    def get_table_priority(table_lower, table_origin_dict):
+        """
+        Retourne la priorité d'une table pour l'ordre d'affichage:
+        1 = Table_RDMS (plus haute priorité)
+        2 = Table_Hive 
+        3 = Dep_datalake_* (plus basse priorité)
+        """
+        origins = table_origin_dict.get(table_lower, set())
+        
+        if 'Table_RDMS' in origins:
+            return 1
+        elif 'Table_Hive' in origins:
+            return 2
+        elif any('Dep_datalake' in origin for origin in origins):
+            return 3
+        else:
+            return 4  # Autres cas
+    
+    def sort_tables_by_logical_order(tables_list, table_origin_dict):
+        """
+        Trie les tables selon l'ordre logique : RDMS → Hive → Datalake
+        """
+        return sorted(tables_list, key=lambda t: get_table_priority(t.lower(), table_origin_dict))
+    
     # Construction du graphe
     @st.cache_data
     def build_graph(data):
@@ -243,19 +268,23 @@ else:
                           if table_lower.split('.')[0] in t.lower()]
                 if similar:
                     st.markdown("#### Tables similaires :")
-                    for s in similar[:5]:
+                    similar_sorted = sort_tables_by_logical_order(similar, table_origin)
+                    for s in similar_sorted[:5]:
                         st.markdown(f"- {s}")
             else:
                 st.markdown(f"### Résultats pour '{table_original}'")
                 
                 # Afficher les résultats selon le mode d'analyse
                 if analysis_mode == "Dépendances directes":
-                    deps = sorted([get_original_case(d) for d in graph.get(table_lower, set())])
-                    st.markdown(f"#### Dépendances directes ({len(deps)})")
-                    if deps:
+                    deps_lower = graph.get(table_lower, set())
+                    deps = [get_original_case(d) for d in deps_lower]
+                    deps_sorted = sort_tables_by_logical_order(deps, table_origin)
+                    
+                    st.markdown(f"#### Dépendances directes ({len(deps_sorted)})")
+                    if deps_sorted:
                         with st.container():
                             st.markdown('<div class="result-box">', unsafe_allow_html=True)
-                            for dep in deps:
+                            for dep in deps_sorted:
                                 st.markdown(f"- {dep}")
                             st.markdown('</div>', unsafe_allow_html=True)
                     else:
@@ -263,12 +292,15 @@ else:
                 
 
                 elif analysis_mode == "Utilisateurs":
-                    users = sorted([get_original_case(u) for u in reverse_graph.get(table_lower, set())])
-                    st.markdown(f"#### Utilisateurs ({len(users)})")
-                    if users:
+                    users_lower = reverse_graph.get(table_lower, set())
+                    users = [get_original_case(u) for u in users_lower]
+                    users_sorted = sort_tables_by_logical_order(users, table_origin)
+                    
+                    st.markdown(f"#### Utilisateurs ({len(users_sorted)})")
+                    if users_sorted:
                         with st.container():
                             st.markdown('<div class="result-box">', unsafe_allow_html=True)
-                            for user in users:
+                            for user in users_sorted:
                                 st.markdown(f"- {user}")
                             st.markdown('</div>', unsafe_allow_html=True)
                     else:
@@ -304,12 +336,23 @@ else:
                             st.info("Origine inconnue")
                         
                         st.markdown("#### Dépendances")
-                        deps = graph.get(table_lower, set())
-                        if deps:
-                            st.markdown(f"**{len(deps)}** tables dépendantes")
+                        deps_lower = graph.get(table_lower, set())
+                        if deps_lower:
+                            deps = [get_original_case(d) for d in deps_lower]
+                            deps_sorted = sort_tables_by_logical_order(deps, table_origin)
+                            st.markdown(f"**{len(deps_sorted)}** tables dépendantes")
                             with st.expander("Voir les dépendances"):
-                                for dep in sorted([get_original_case(d) for d in deps]):
-                                    st.markdown(f"- {dep}")
+                                for dep in deps_sorted:
+                                    dep_lower = dep.lower()
+                                    origins = table_origin.get(dep_lower, set())
+                                    origin_type = ""
+                                    if 'Table_RDMS' in origins:
+                                        origin_type = " 🗄️ (RDMS)"
+                                    elif 'Table_Hive' in origins:
+                                        origin_type = " 🐝 (Hive)"
+                                    elif any('Dep_datalake' in origin for origin in origins):
+                                        origin_type = " 🏊 (Datalake)"
+                                    st.markdown(f"- {dep}{origin_type}")
                         else:
                             st.info("Aucune dépendance")
                     
@@ -331,12 +374,23 @@ else:
                             st.info("Aucune métadonnée disponible")
                         
                         st.markdown("#### Utilisateurs")
-                        users = reverse_graph.get(table_lower, set())
-                        if users:
-                            st.markdown(f"**{len(users)}** tables utilisatrices")
+                        users_lower = reverse_graph.get(table_lower, set())
+                        if users_lower:
+                            users = [get_original_case(u) for u in users_lower]
+                            users_sorted = sort_tables_by_logical_order(users, table_origin)
+                            st.markdown(f"**{len(users_sorted)}** tables utilisatrices")
                             with st.expander("Voir les utilisateurs"):
-                                for user in sorted([get_original_case(u) for u in users]):
-                                    st.markdown(f"- {user}")
+                                for user in users_sorted:
+                                    user_lower = user.lower()
+                                    origins = table_origin.get(user_lower, set())
+                                    origin_type = ""
+                                    if 'Table_RDMS' in origins:
+                                        origin_type = " 🗄️ (RDMS)"
+                                    elif 'Table_Hive' in origins:
+                                        origin_type = " 🐝 (Hive)"
+                                    elif any('Dep_datalake' in origin for origin in origins):
+                                        origin_type = " 🏊 (Datalake)"
+                                    st.markdown(f"- {user}{origin_type}")
                         else:
                             st.info("Aucun utilisateur")
     

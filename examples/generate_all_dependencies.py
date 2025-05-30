@@ -34,6 +34,8 @@ table_name='MON.FT_GLOBAL_ACTIVITY_DAILY'
 flow_file_path=r"C:\Users\YBQB7360\Documents\Data gouvernance\PRODv2.0\PRODv2.0.json"
 #liste_table=list(dic_table_fields.keys())
 #lineage_dic,_ = measure_execution_time(create_lineage_dic, path, create_table_dic)
+
+
 #export_lineage_to_excel(lineage_dic, "lineage_"+name_file+".xlsx")
 dict_fields_from_dwh=read_json(r"C:\Users\YBQB7360\Documents\Data gouvernance\_data_gouv\tables_mon_fields_description_dict.json")
 
@@ -47,6 +49,7 @@ dic_tables_dependencies = get_dir_dependances_2(dic_files_queries_paths)
 dic_rdms_hive_dependencies=generate_dic_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependencies)
 # permet de ratacher à chaque source de données le ou les noms des hql qui l'alimente
 dict_tables_dependencies_and_fields,_=measure_execution_time(create_dict_tables_dependencies_and_path,dict_table_paths,dic_rdms_hive_dependencies,create_table_dic,dic_files_queries_paths)
+
 
 filter_list=[]
 data_sources_lineage(hdfs_dir,paths_scripts,directory_conf,flow_file_path,filter_list,"dependencies_with_raw_server_filtered.xlsx",filtered=False)  

@@ -39,12 +39,12 @@ dic_files_queries_paths = process_conf_files(directory_conf, hdfs_dir)
 #  dic table hive -> dependances
 dic_tables_dependencies = get_dir_dependances_2(dic_files_queries_paths)
 
-with open("donnees.json", "w", encoding="utf-8") as fichier:
-    json.dump(dic_tables_dependencies, fichier, indent=4, ensure_ascii=False)
+# 
+#with open("donnees.json", "w", encoding="utf-8") as fichier:
+#    json.dump(dic_tables_dependencies, fichier, indent=4, ensure_ascii=False)
 
+#data: dictionnaisse des tables hive et leurs dépendances
 data = json.load('C:/Users/YBQB7360/Documents/Data gouvernance/_data_gouv/donnees.json')
-
-
 
 
 #display_table_dependencies_for_datalake_tables(dic_tables_dependencies)

@@ -19,7 +19,7 @@ EXTRACTION_CDR.py: scripts to display CDR related to datawarehouse tables
 
 You need some elements for this code:
 - the hdfs directory
-- the dictionary of datawarehouse fields (table_name->list of fields) in .json format
+- the dictionary of datawarehouse fields (table_name->list of fields) in .json format : use dwh.py to generate this .json file
 - the nifi flow file in .json format
 
 
@@ -44,12 +44,15 @@ Errors explanations:
      uv venv
      uv pip install -e .
 
+or install the libraries in the in the "pyproject.toml" with a "pip install"
 
-3) modify the demo.py to use function of the package or create your own .py file to use the function that you need
-
+3) the directory "example" example of how to use the code 
 4) to runthe code use: uv run <nom_fichier.py>
 
 
+# THE APP
+
+In the directory "DEPENDANCES_FINALES/DEPENDANCES_FINALES.py" you can explore dependencies on a user interface by using the command: streamlit run DEPENDANCES_FINALES.py
 
 # Limitations
 
