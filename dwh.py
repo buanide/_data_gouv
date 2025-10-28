@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+
 import oracledb
 import pandas as pd
 import json
@@ -25,6 +25,7 @@ WHERE OWNER = 'MON'
 ORDER BY OWNER, TABLE_NAME, COLUMN_ID
 """
 if a.upper() == 'OK':
+    
     cursor.execute(query)
     tables = cursor.fetchall()
     df=pd.DataFrame(tables, columns=['OWNER', 'TABLE_NAME', 'COLUMN_NAME'])

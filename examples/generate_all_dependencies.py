@@ -34,10 +34,18 @@ dic_files_queries_paths = process_conf_files(directory_conf, hdfs_dir)
 #  dic table hive -> dependances
 dic_tables_dependencies = get_dir_dependances_2(dic_files_queries_paths)
 #display_table_dependencies_2(dic_tables_dependencies,"MON.SPARK_SMS_PARC")
+print("++++dic_tables_dependencies+++")
+print("dic_tables_dependencies",dic_tables_dependencies)
+
 dic_rdms_hive_dependencies=generate_dic_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependencies)
+
+print("++++dic_rdms_hive_dependencies+++")
+for i,value in dic_rdms_hive_dependencies.items():
+    print("i",i,"value",value)
+    break
 # permet de ratacher à chaque source de données le ou les noms des hql qui l'alimente
 filter_list=[]
-data_sources_lineage(hdfs_dir,paths_scripts,directory_conf,flow_file_path,filter_list,"dependencies_with_raw_server_filtered.xlsx",filtered=False)  
+#data_sources_lineage(hdfs_dir,paths_scripts,directory_conf,flow_file_path,filter_list,"dependencies_with_raw_server_filtered.xlsx",filtered=False)  
 #dict_tables_hive,_=measure_execution_time(create_dict_tables_dependencies_and_path_for_hive_tables,dict_table_paths,dic_tables_dependencies,create_table_dic)
 
 
