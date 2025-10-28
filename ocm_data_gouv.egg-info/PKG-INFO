@@ -32,6 +32,14 @@ format_json: contains function to parse and structure metadatas from Nifi flow f
 dwh.py: contains a scripts that create a dictionary that contains the fields for each table in the datawarehouse
 EXTRACTION_CDR.py: scripts to display CDR related to datawarehouse tables
 
+## requirements
+
+You need some elements for this code:
+- the hdfs directory
+- the dictionary of datawarehouse fields (table_name->list of fields) in .json format : use dwh.py to generate this .json file
+- the nifi flow file in .json format
+
+
 ## tips
 
 Errors explanations: 
@@ -53,18 +61,21 @@ Errors explanations:
      uv venv
      uv pip install -e .
 
+or install the libraries in the in the "pyproject.toml" with a "pip install"
 
-3) modify the demo.py to use function of the package or create your own .py file to use the function that you need
-
+3) the directory "example" example of how to use the code 
 4) to runthe code use: uv run <nom_fichier.py>
-You need some elements for this code:
-
-- the hdfs directory
-- the dictionary of datawarehouse fields (table_name->list of fields)
-- the nifi flow file
 
 
+# THE APP
 
+In the directory "DEPENDANCES_FINALES/DEPENDANCES_FINALES.py" you can explore dependencies on a user interface by using the command: streamlit run DEPENDANCES_FINALES.py
+
+# Limitations
+
+- Some fields can't be totally described cause of the complexity of the request
+- The order in which caclulation are done in field lineage have to de be refined
+- The time of execution for complex Hive Query Language could be improved 
 
 
 

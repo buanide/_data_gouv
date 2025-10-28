@@ -1344,7 +1344,7 @@ def display_table_dependencies_for_datalake_tables(dependency_map: dict) -> None
 
     # Déterminer le nombre maximum de colonnes pour formater correctement
     max_columns = max(len(row) for row in rows)
-    columns = ["Table_Principale"] + [f"Dépendance{i}" for i in range(1, max_columns)]
+    columns = ["Table_Principale"] + [f"Dep_datalake{i}" for i in range(1, max_columns)]
 
 
     # Créer un DataFrame avec les données collectées

@@ -35,11 +35,11 @@ dict_table_paths=map_rdms_file_hql_file(dic_rdms_hive,file_scripts_paths)
 dic_files_queries_paths = process_conf_files(directory_conf, hdfs_dir)
 
 #  dic table hive -> dependances
-dic_tables_dependencies = get_dir_dependances_2(dic_files_queries_paths)
+#dic_tables_dependencies = get_dir_dependances_2(dic_files_queries_paths)
 #display_table_dependencies_2(dic_tables_dependencies,"MON.SPARK_SMS_PARC")
-dic_rdms_hive_dependencies=generate_dic_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependencies)
+#dic_rdms_hive_dependencies=generate_dic_with_rdms_and_dependencies(dic_rdms_hive, dic_tables_dependencies)
 # permet de ratacher à chaque source de données le ou les noms des hql qui l'alimente
-dict_tables_dependencies_and_fields,_=measure_execution_time(create_dict_tables_dependencies_and_path,dict_table_paths,dic_rdms_hive_dependencies,create_table_dic,dic_files_queries_paths)
+#dict_tables_dependencies_and_fields,_=measure_execution_time(create_dict_tables_dependencies_and_path,dict_table_paths,dic_rdms_hive_dependencies,create_table_dic,dic_files_queries_paths)
 
 """
 for i,value in dict_tables_dependencies_and_fields.items():
