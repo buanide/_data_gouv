@@ -105,6 +105,8 @@ def read_json(input_file):
 
 
 
+# à supprimer 
+
 def generate_json_schema(data):
     # Parcourt récursivement les types de données
     if isinstance(data, dict):
@@ -264,6 +266,41 @@ def create_dic_identifier(data_dict: dict, key: str):
                 name = value.get("name", None)
             dic_identifier[i] = {"name": name, "identifier": identifier}
     return dic_identifier
+
+
+def create_tab_processors(data_dict: dict):
+    """
+    Permet de créer un tableau contenant les processors des process groups, sans doublons.
+    Args:
+        data_dict (dict): Dictionnaire contenant les données à analyser.
+    Returns:
+        pd.DataFrame: DataFrame contenant les processors uniques.
+    """
+    processors_data = []  # Liste pour stocker les dictionnaires de processors
+
+    key = "processGroups"
+    groups = extract_dict_from_key(data_dict, key)
+
+    for group in groups:
+        if "processors" in group:
+            name = group.get("name", None)  # Nom du processGroup
+            for p in group["processors"]:
+                if "name" in p and "bundle" in p:
+                    processor_name = p.get("name", None)  # Nom du processor (si différent du group)
+                    version = p["bundle"].get("version", None)
+                    processors_data.append({
+                        "group_name": name,  # Nom du groupe parent
+                        "processor_name": processor_name,  # Nom du processor
+                        "version": version
+                    })
+
+    # Créer le DataFrame et supprimer les doublons
+    df = pd.DataFrame(processors_data)
+    df_final = df.drop_duplicates()  # Supprime les doublons sur toutes les colonnes
+
+    # Exporter vers Excel
+    df_final.to_excel("processors_2.xlsx", index=False)
+    return df_final
 
 
 # key="processGroups"

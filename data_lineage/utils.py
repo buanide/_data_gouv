@@ -1277,16 +1277,10 @@ def display_table_dependencies(dependency_map: dict, table_name: str) -> None:
 def display_table_dependencies_for_datalake_tables(dependency_map: dict) -> None:
     """
     Affiche les dépendances de toutes les tables du datalake prsentes dans dependency_map, y compris le chemin 'raw', et les écrit dans un fichier Excel.
-
-
     Args:
-        dependency_map (dict): Dictionnaire des dépendances {table_principale: {'dependances': [dépendances], 'raw': chemin_raw}}.
+        dependency_map (dict): Dictionnaire des dépendances généré par get_dir_dependances_2 {table_principale: {'dependances': [dépendances], 'raw': chemin_raw}}.
         table_name (str): Nom de la table pour laquelle afficher les dépendances.
-
-
-
-
-    exemple d'appel: display_table_dependencies_2(dic_tables_dependances,"AGG.SPARK_FT_GLOBAL_ACTIVITY_DAILY")
+    exemple d'appel: display_table_dependencies_for_datalake_tables(dic_tables_dependances)
     """
     # Liste pour stocker les chemins uniques de dépendances
     unique_paths = set()

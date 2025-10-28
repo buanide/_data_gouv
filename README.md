@@ -2,7 +2,7 @@
 
 ## Summary
 
-This archive aims to enable the extraction of metadata (table dependencies, field dependencies, field descriptions) from various data sources within the OCM ecosystem:
+This archive aims to enable the extraction of metadata (table dependencies, field dependencies, field descriptions) from various data sources within the "---" ecosystem:
 
 Dependencies of a data source: an element without which the table could not be calculated.
 Field dependencies: field a = field c + field d => field a depends on c and d.
